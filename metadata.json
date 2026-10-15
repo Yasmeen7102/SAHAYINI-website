@@ -1,0 +1,11 @@
+{
+  "name": "SAHAYINI — Safety • Support • Digital Access",
+  "description": "An inclusive digital support platform for students and the public, focused on safety, digital learning, government schemes, and scam awareness.",
+  "requestFramePermissions": [
+    "geolocation",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

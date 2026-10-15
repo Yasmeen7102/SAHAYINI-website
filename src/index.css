@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+/*
+ * Readability update: darker text shades.
+ * Tailwind builds every text-slate-* / border / bg utility from these variables, so adjusting
+ * them here darkens text everywhere (headings, descriptions, cards, labels, inputs) without
+ * touching the layout or colour scheme. Dark and high-contrast themes keep their own explicit
+ * overrides further down in this file.
+ *   900 / 800  -> primary text: dark navy / charcoal
+ *   700 / 600  -> strong secondary text
+ *   500 / 400  -> secondary / muted text (was too pale)
+ */
+@theme {
+  --color-slate-900: #0b1b34;
+  --color-slate-800: #14233f;
+  --color-slate-700: #26354f;
+  --color-slate-600: #34445c;
+  --color-slate-500: #4a5a72;
+  --color-slate-400: #66768d;
+}
+
+@layer base {
+  html {
+    font-family: 'Plus Jakarta Sans', 'Noto Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Placeholders and form text were too faint */
+  input::placeholder,
+  textarea::placeholder {
+    color: #5b6b82;
+    opacity: 1;
+  }
+  input,
+  textarea,
+  select {
+    color: #0b1b34;
+  }
+}
+
+/* Dark Theme Overrides */
+html.theme-dark {
+  color-scheme: dark;
+}
+html.theme-dark body {
+  background-color: #0b1120;
+  color: #f1f5f9;
+}
+html.theme-dark .bg-white {
+  background-color: #111827 !important;
+  color: #f3f4f6 !important;
+  border-color: #1f2937 !important;
+}
+html.theme-dark .bg-slate-50,
+html.theme-dark .bg-slate-50\/40,
+html.theme-dark .bg-slate-50\/50,
+html.theme-dark .bg-slate-50\/70 {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+html.theme-dark .text-slate-900,
+html.theme-dark .text-slate-800 {
+  color: #f8fafc !important;
+}
+html.theme-dark .text-slate-700,
+html.theme-dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+html.theme-dark .text-slate-500,
+html.theme-dark .text-slate-400 {
+  color: #94a3b8 !important;
+}
+html.theme-dark input,
+html.theme-dark textarea,
+html.theme-dark select {
+  color: #f1f5f9;
+}
+html.theme-dark input::placeholder,
+html.theme-dark textarea::placeholder {
+  color: #94a3b8;
+}
+html.theme-dark .border-slate-200,
+html.theme-dark .border-slate-200\/80,
+html.theme-dark .border-slate-200\/90,
+html.theme-dark .border-slate-100 {
+  border-color: #334155 !important;
+}
+
+/* High Contrast Accessibility Mode */
+html.theme-contrast body {
+  background-color: #000000;
+  color: #ffffff;
+}
+html.theme-contrast .bg-white,
+html.theme-contrast .bg-slate-50 {
+  background-color: #000000 !important;
+  color: #ffff00 !important;
+  border: 2px solid #ffffff !important;
+}
+html.theme-contrast h1,
+html.theme-contrast h2,
+html.theme-contrast h3,
+html.theme-contrast p,
+html.theme-contrast span {
+  color: #ffffff !important;
+}
+html.theme-contrast button {
+  border: 2px solid #ffffff !important;
+}
+
+/* Global Text Scaling Accessibility Modes */
+html.text-scale-large {
+  font-size: 110%;
+}
+html.text-scale-xlarge {
+  font-size: 122%;
+}
+
+/* Slow Spin Animation for Ashoka Chakra */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 24s linear infinite;
+}
+
+html.theme-contrast input,
+html.theme-contrast textarea,
+html.theme-contrast select {
+  color: #ffffff;
+}
+html.theme-contrast input::placeholder,
+html.theme-contrast textarea::placeholder {
+  color: #e5e5e5;
+}
