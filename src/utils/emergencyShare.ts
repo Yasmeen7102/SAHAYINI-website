@@ -5,6 +5,9 @@
  * A web app cannot send SMS silently. These helpers build the message and open the phone's
  * own messaging app / WhatsApp pre-addressed to the right numbers; the user taps Send.
  */
+import { LanguageCode } from '../types';
+import { getLocationStrings, fill } from '../i18n/locationStrings';
+
 export interface Coords {
   lat: number;
   lng: number;
@@ -51,11 +54,12 @@ export function mapsLink(c: Coords): string {
   return `https://maps.google.com/?q=${c.lat},${c.lng}`;
 }
 
-export function buildAlertText(c: Coords, station?: PoliceStation | null): string {
-  const base = `🚨 EMERGENCY from SAHAYINI: I need help. My live location: ${mapsLink(c)} (lat ${c.lat.toFixed(5)}, lng ${c.lng.toFixed(5)}`;
-  const acc = c.accuracy ? `, accuracy ±${Math.round(c.accuracy)} m` : '';
-  const near = station ? ` Nearest police station: ${station.name} (${station.distanceKm.toFixed(1)} km).` : '';
-  return `${base}${acc}).${near} Please call me or send help.`;
+export function buildAlertText(c: Coords, station?: PoliceStation | null, lang: LanguageCode = 'en'): string {
+  const L = getLocationStrings(lang);
+  const acc = c.accuracy ? fill(L.msgAcc, { m: Math.round(c.accuracy) }) : '';
+  const base = fill(L.msgAlert, { link: mapsLink(c), lat: c.lat.toFixed(5), lng: c.lng.toFixed(5), acc });
+  const near = station ? fill(L.msgNear, { name: `${station.name} (${station.distanceKm.toFixed(1)} km)` }) : '';
+  return `${base}${near}${L.msgAlertEnd}`;
 }
 
 export function smsHref(phones: string[], body: string): string {

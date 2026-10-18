@@ -5,7 +5,9 @@ import { Logo } from '../common/Logo';
 import { LiveLocationShare } from '../common/LiveLocationShare';
 import { CaptureLocationCard } from '../common/CaptureLocationCard';
 import { NearbyPoliceCard } from '../common/NearbyPoliceCard';
+import { VoiceSafetyMonitor } from '../common/VoiceSafetyMonitor';
 import { getComplaintStrings } from '../../i18n/complaintStrings';
+import { getSosStrings, relationLabel } from '../../i18n/sosStrings';
 import {
   PhoneCall,
   AlertTriangle,
@@ -29,6 +31,7 @@ import {
 export const SosView: React.FC = () => {
   const { contacts, addContact, deleteContact, isOffline, t, language, setActiveTab } = useApp();
   const cs = getComplaintStrings(language);
+  const ss = getSosStrings(language);
 
   const [coords, setCoords] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
   const [locating, setLocating] = useState(false);
@@ -54,9 +57,23 @@ export const SosView: React.FC = () => {
     { number: '14416', title: 'Tele-MANAS (Mental Health Support)', desc: '24x7 confidential psychological counseling', color: 'border-teal-500 bg-teal-50 text-teal-700' },
   ];
 
+  // Built-in default contacts (ids 1-4) are stored in English; show them in the selected language
+  // unless the user renamed them. User-created contacts are always shown exactly as typed.
+  const defaultName = (c: { id: string; name: string }) => {
+    const d = ss.defaultContacts[c.id];
+    const en = getSosStrings('en').defaultContacts[c.id];
+    return d && en && c.name === en.name ? d.name : c.name;
+  };
+  const defaultRel = (c: { id: string; relationship: string }) => {
+    const d = ss.defaultContacts[c.id];
+    const en = getSosStrings('en').defaultContacts[c.id];
+    if (d && en && (c.relationship === en.relationship || c.relationship.startsWith('Toll-free') || c.relationship === 'Financial Fraud Reporting' || c.relationship === 'Official Emergency Center')) return d.relationship;
+    return relationLabel(c.relationship, ss);
+  };
+
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
+      alert(ss.geoUnsupported);
       return;
     }
     setLocating(true);
@@ -71,7 +88,7 @@ export const SosView: React.FC = () => {
       },
       (err) => {
         setLocating(false);
-        alert('Permission required to access live location for emergency sharing.');
+        alert(ss.geoDenied);
       },
       { enableHighAccuracy: true, timeout: 12000 }
     );
@@ -122,7 +139,7 @@ export const SosView: React.FC = () => {
       <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/90 text-amber-900 text-xs sm:text-sm leading-relaxed flex items-start gap-3 shadow-2xs">
         <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
         <div>
-          <span className="font-bold">Transparent Emergency Policy: </span>
+          <span className="font-bold">{ss.policyLabel}</span>
           {t.sos.bannerWarning}
         </div>
       </div>
@@ -135,13 +152,13 @@ export const SosView: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-extrabold text-sm sm:text-base">Offline Safety & Emergency Kit</h3>
+              <h3 className="font-extrabold text-sm sm:text-base">{ss.offlineKitTitle}</h3>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                <Zap className="w-2.5 h-2.5 fill-emerald-400" /> Precached
+                <Zap className="w-2.5 h-2.5 fill-emerald-400" /> {ss.precached}
               </span>
             </div>
             <p className="text-xs text-white/80 mt-0.5 max-w-xl">
-              11 Emergency Helplines, No-Data SMS GPS Dispatcher & 5 Safety Playbooks are stored on your device for low-connectivity rural zones.
+              {ss.offlineKitDesc}
             </p>
           </div>
         </div>
@@ -150,7 +167,7 @@ export const SosView: React.FC = () => {
           className="w-full sm:w-auto px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-sm transition whitespace-nowrap cursor-pointer flex items-center justify-center gap-2"
         >
           <HardDrive className="w-4 h-4" />
-          <span>Open Offline Kit</span>
+          <span>{ss.openOfflineKit}</span>
         </button>
       </div>
 
@@ -277,6 +294,9 @@ export const SosView: React.FC = () => {
         )}
       </div>
 
+      {/* Automatic voice safety monitor and emergency voice-message recording */}
+      <VoiceSafetyMonitor contacts={contacts} language={language} coords={coords} />
+
       {/* Capture The Location (separate from police search) */}
       <CaptureLocationCard />
 
@@ -328,7 +348,7 @@ export const SosView: React.FC = () => {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                    {contact.name}
+                    {defaultName(contact)}
                   </h4>
                   {contact.isPrimary && (
                     <span className="px-1.5 py-0.5 bg-blue-100 text-[#0A2E65] text-[10px] font-bold rounded-xs">
@@ -336,7 +356,7 @@ export const SosView: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-slate-500">{contact.relationship}</p>
+                <p className="text-[11px] text-slate-500">{defaultRel(contact)}</p>
                 <p className="text-xs font-mono font-semibold text-slate-700 mt-0.5">
                   {contact.phone}
                 </p>
@@ -346,7 +366,7 @@ export const SosView: React.FC = () => {
                 <a
                   href={`tel:${contact.phone}`}
                   className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full shadow-xs transition-colors"
-                  title={`Call ${contact.name}`}
+                  title={ss.callName.replace('{name}', defaultName(contact))}
                 >
                   <PhoneCall className="w-3.5 h-3.5" />
                 </a>
@@ -355,7 +375,7 @@ export const SosView: React.FC = () => {
                   <button
                     onClick={() => deleteContact(contact.id)}
                     className="p-2 text-slate-400 hover:text-red-600 rounded-full hover:bg-red-50 transition-colors"
-                    title="Delete Contact"
+                    title={ss.deleteContact}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -372,7 +392,7 @@ export const SosView: React.FC = () => {
           {t.sos.helplinesTitle}
         </h3>
         <p className="text-xs text-slate-500 mb-4">
-          Verified national government emergency helplines operational 24 hours a day, 7 days a week.
+          {ss.helplinesIntro}
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -388,10 +408,10 @@ export const SosView: React.FC = () => {
                   </span>
                 </div>
                 <h4 className="text-xs font-bold text-slate-900 mt-0.5">
-                  {line.title}
+                  {ss.helplines[line.number]?.title ?? line.title}
                 </h4>
                 <p className="text-[11px] text-slate-600 leading-tight mt-0.5">
-                  {line.desc}
+                  {ss.helplines[line.number]?.desc ?? line.desc}
                 </p>
               </div>
 
@@ -400,7 +420,7 @@ export const SosView: React.FC = () => {
                 className="px-3 py-1.5 bg-white text-slate-900 border border-slate-300 hover:bg-slate-50 text-xs font-extrabold rounded-full shadow-2xs shrink-0 flex items-center gap-1.5"
               >
                 <PhoneCall className="w-3 h-3 text-emerald-600" />
-                <span>Call</span>
+                <span>{ss.call}</span>
               </a>
             </div>
           ))}
@@ -464,7 +484,7 @@ export const SosView: React.FC = () => {
                   required
                   value={newContactName}
                   onChange={(e) => setNewContactName(e.target.value)}
-                  placeholder="e.g. Brother, Kavitha"
+                  placeholder={ss.namePlaceholder}
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#0A2E65]"
                 />
               </div>
@@ -476,7 +496,7 @@ export const SosView: React.FC = () => {
                   required
                   value={newContactPhone}
                   onChange={(e) => setNewContactPhone(e.target.value)}
-                  placeholder="e.g. 9876543210"
+                  placeholder={ss.phonePlaceholder}
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#0A2E65]"
                 />
               </div>
@@ -488,11 +508,11 @@ export const SosView: React.FC = () => {
                   onChange={(e) => setNewContactRelation(e.target.value)}
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white"
                 >
-                  <option value="Parent / Family">Parent / Family</option>
-                  <option value="Sibling">Sibling</option>
-                  <option value="Close Friend">Close Friend</option>
-                  <option value="Neighbor / Local Contact">Neighbor / Local Contact</option>
-                  <option value="Colleague / Mentor">Colleague / Mentor</option>
+                  <option value="Parent / Family">{ss.relations.family}</option>
+                  <option value="Sibling">{ss.relations.sibling}</option>
+                  <option value="Close Friend">{ss.relations.friend}</option>
+                  <option value="Neighbor / Local Contact">{ss.relations.neighbor}</option>
+                  <option value="Colleague / Mentor">{ss.relations.colleague}</option>
                 </select>
               </div>
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MapPin, Phone, Navigation, Send, Loader2, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { getLocationStrings, fill } from '../../i18n/locationStrings';
 import {
   Coords,
   PoliceStation,
@@ -17,7 +18,8 @@ import {
  * emergency contact they saved, in one tap.
  */
 export const LiveLocationShare: React.FC<{ coords: Coords }> = ({ coords }) => {
-  const { contacts } = useApp();
+  const { contacts, language } = useApp();
+  const L = getLocationStrings(language);
   const [station, setStation] = useState<PoliceStation | null>(null);
   const [status, setStatus] = useState<'searching' | 'found' | 'none' | 'error'>('searching');
 
@@ -44,7 +46,7 @@ export const LiveLocationShare: React.FC<{ coords: Coords }> = ({ coords }) => {
     };
   }, [coords.lat, coords.lng]);
 
-  const message = buildAlertText(coords, station);
+  const message = buildAlertText(coords, station, language);
   const contactPhones = contacts.map((c) => c.phone).filter(Boolean);
   const policeSms = station?.smsPhone ? [station.smsPhone] : [];
   const allRecipients = [...policeSms, ...contactPhones];
@@ -56,7 +58,7 @@ export const LiveLocationShare: React.FC<{ coords: Coords }> = ({ coords }) => {
     <div className="mt-3 p-4 bg-white rounded-2xl border border-indigo-200 space-y-3 text-slate-900">
       <div className="flex items-center gap-2 text-sm font-extrabold text-[#0A2E65]">
         <ShieldCheck className="w-4 h-4" />
-        <span>Send my live location to police &amp; my contacts</span>
+        <span>{L.liveTitle}</span>
       </div>
 
       {/* Nearest police station */}
@@ -64,7 +66,7 @@ export const LiveLocationShare: React.FC<{ coords: Coords }> = ({ coords }) => {
         {status === 'searching' && (
           <div className="flex items-center gap-2 font-semibold text-slate-800">
             <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Finding the nearest police station…</span>
+            <span>{L.liveSearching}</span>
           </div>
         )}
         {status === 'found' && station && (
@@ -72,7 +74,7 @@ export const LiveLocationShare: React.FC<{ coords: Coords }> = ({ coords }) => {
             <div className="font-bold text-slate-900 flex items-start gap-1.5">
               <MapPin className="w-4 h-4 text-red-700 shrink-0" />
               <span>
-                {station.name} — {station.distanceKm.toFixed(1)} km away
+                {fill(L.liveAway, { name: station.name, km: station.distanceKm.toFixed(1) })}
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -81,7 +83,7 @@ export const LiveLocationShare: React.FC<{ coords: Coords }> = ({ coords }) => {
                   href={`tel:${station.phone.split(/[;,/]/)[0].replace(/[^\d+]/g, '')}`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-700 text-white rounded-lg font-bold"
                 >
-                  <Phone className="w-3.5 h-3.5" /> Call station
+                  <Phone className="w-3.5 h-3.5" /> {L.callStation}
                 </a>
               )}
               <a
@@ -90,13 +92,12 @@ export const LiveLocationShare: React.FC<{ coords: Coords }> = ({ coords }) => {
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-900 rounded-lg font-bold"
               >
-                <Navigation className="w-3.5 h-3.5" /> Directions
+                <Navigation className="w-3.5 h-3.5" /> {L.directions}
               </a>
             </div>
             {!station.smsPhone && (
               <p className="text-slate-700 leading-relaxed">
-                This station has no mobile number listed for SMS, so the message below goes to your contacts. Please
-                also call the station or dial 112.
+                {L.liveNoSms}
               </p>
             )}
           </>
@@ -105,10 +106,8 @@ export const LiveLocationShare: React.FC<{ coords: Coords }> = ({ coords }) => {
           <div className="flex items-start gap-2 text-amber-950">
             <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
             <span className="leading-relaxed">
-              {status === 'error'
-                ? 'Could not look up the nearest police station (no internet or the map service did not respond).'
-                : 'No police station was found near you in the map data.'}{' '}
-              Please dial 112 now. Your contacts can still receive your location by SMS.
+              {status === 'error' ? L.liveLookupFail : L.liveNone}{' '}
+              {L.liveDial112}
             </span>
           </div>
         )}
@@ -116,7 +115,7 @@ export const LiveLocationShare: React.FC<{ coords: Coords }> = ({ coords }) => {
           href="tel:112"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-300 text-red-800 rounded-lg font-bold"
         >
-          <Phone className="w-3.5 h-3.5" /> Call 112 (Police / Emergency)
+          <Phone className="w-3.5 h-3.5" /> {L.liveCall112}
         </a>
       </div>
 
@@ -128,14 +127,12 @@ export const LiveLocationShare: React.FC<{ coords: Coords }> = ({ coords }) => {
         >
           <Send className="w-4 h-4" />
           <span>
-            Send SMS
-            {policeSms.length ? ' to police station + ' : ' to '}
-            {contactPhones.length} contact{contactPhones.length === 1 ? '' : 's'}
+            {policeSms.length ? fill(L.liveSendPolice, { n: contactPhones.length }) : fill(L.liveSendTo, { n: contactPhones.length })}
           </span>
         </a>
       ) : (
         <p className="text-xs font-semibold text-amber-950 bg-amber-50 border border-amber-300 rounded-xl p-2.5">
-          You have no emergency contacts saved. Add them in the SOS page under “Trusted Emergency Contacts”.
+          {L.liveNoContacts}
         </p>
       )}
 

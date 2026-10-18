@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Siren, Loader2, AlertTriangle, MapPin, Navigation, Phone, RefreshCw, Clock, Info, ExternalLink } from 'lucide-react';
 import { Coords } from '../../utils/emergencyShare';
+import { useApp } from '../../context/AppContext';
+import { getLocationStrings, fill } from '../../i18n/locationStrings';
 import {
   NearbyPoliceError,
   NearbyPoliceResponse,
@@ -16,6 +18,8 @@ type Phase = 'idle' | 'locating' | 'searching' | 'done' | 'error';
  * (/api/nearby-police). Finding a station does NOT notify anyone.
  */
 export const NearbyPoliceCard: React.FC = () => {
+  const { language } = useApp();
+  const L = getLocationStrings(language);
   const [phase, setPhase] = useState<Phase>('idle');
   const [coords, setCoords] = useState<Coords | null>(null);
   const [result, setResult] = useState<NearbyPoliceResponse | null>(null);
@@ -26,7 +30,7 @@ export const NearbyPoliceCard: React.FC = () => {
     setError(null);
     if (!('geolocation' in navigator)) {
       setPhase('error');
-      setError('This browser does not support location access. You can still call 112.');
+      setError(L.geoOther + ' ' + L.inDanger);
       return;
     }
     const id = ++runId.current;
@@ -49,10 +53,10 @@ export const NearbyPoliceCard: React.FC = () => {
           const err = e instanceof NearbyPoliceError ? e : null;
           setError(
             err?.kind === 'offline'
-              ? 'You appear to be offline, so nearby stations cannot be searched. Call 112, or try again when you have internet.'
+              ? L.errOffline
               : err?.kind === 'network'
-              ? 'Could not reach the SAHAYINI server. Check your internet connection and try again.'
-              : err?.message || 'The search failed. Please try again.'
+              ? L.errNetwork
+              : L.errSearch
           );
         }
       },
@@ -61,10 +65,10 @@ export const NearbyPoliceCard: React.FC = () => {
         setPhase('error');
         setError(
           err.code === err.PERMISSION_DENIED
-            ? 'Location permission was denied. Allow location access for this site in your browser settings, then try again.'
+            ? L.geoDenied
             : err.code === err.TIMEOUT
-            ? 'Getting your location took too long. Check GPS or signal and try again.'
-            : 'Your location is currently unavailable. Turn on GPS / location services and try again.'
+            ? L.geoTimeout
+            : L.geoUnavailable
         );
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -81,8 +85,8 @@ export const NearbyPoliceCard: React.FC = () => {
             <Siren className="w-5 h-5" aria-hidden="true" />
           </div>
           <div>
-            <h3 id="nearby-police-title" className="text-base font-bold text-slate-900">Find Nearby Police Stations</h3>
-            <p className="text-xs text-slate-600">Find police stations near your current location when you need assistance.</p>
+            <h3 id="nearby-police-title" className="text-base font-bold text-slate-900">{L.pTitle}</h3>
+            <p className="text-xs text-slate-600">{L.pDesc}</p>
           </div>
         </div>
         <button
@@ -93,7 +97,7 @@ export const NearbyPoliceCard: React.FC = () => {
         >
           {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
           <span>
-            {phase === 'locating' ? 'Getting your location…' : phase === 'searching' ? 'Searching…' : '🚔 Find Nearby Police Stations'}
+            {phase === 'locating' ? L.locating : phase === 'searching' ? L.searching : L.pBtn}
           </span>
         </button>
       </div>
@@ -102,15 +106,14 @@ export const NearbyPoliceCard: React.FC = () => {
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-950 flex items-start gap-2 leading-relaxed">
           <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
           <span>
-            <strong>Finding a station does not alert the police.</strong> Your location is not sent to any station. In an
-            emergency, call{' '}
+            <strong>{L.pNotAlertStrong}</strong>{L.pNotAlertRest}
             <a href="tel:112" className="font-extrabold underline">112</a>.
           </span>
         </div>
 
-        {phase === 'error' && error && (
-          <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-950 flex items-start gap-2 leading-relaxed">
-            <AlertTriangle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" aria-hidden="true" />
+        {phase === 'error' && error && ![L.errSearch, L.errNetwork, L.errOffline].includes(error) && (
+          <div role="status" className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-950 flex items-start gap-2 leading-relaxed">
+            <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
             <span>{error}</span>
           </div>
         )}
@@ -119,8 +122,7 @@ export const NearbyPoliceCard: React.FC = () => {
           <>
             <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600">
               <span>
-                Searched near {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
-                {coords.accuracy ? ` (±${Math.round(coords.accuracy)} m)` : ''} · Source:{' '}
+                {fill(L.searchedNear, { where: `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}${coords.accuracy ? ` (±${Math.round(coords.accuracy)} m)` : ''}` })} · {L.source}:{' '}
                 {result.source === 'google_places' ? 'Google Places' : 'OpenStreetMap contributors'}
               </span>
               <button
@@ -128,21 +130,21 @@ export const NearbyPoliceCard: React.FC = () => {
                 onClick={run}
                 className="inline-flex items-center gap-1.5 px-3 py-2 min-h-11 bg-white border border-slate-300 rounded-lg font-bold text-slate-800 cursor-pointer"
               >
-                <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> Refresh with my latest location
+                <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> {L.refresh}
               </button>
             </div>
 
             {result.stations.length === 0 ? (
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-800 space-y-2 leading-relaxed">
-                <p className="font-bold">No police stations were found near you in the map data.</p>
-                <p>The map data may be incomplete in your area. Try Google Maps, or call 112.</p>
+                <p className="font-bold">{L.noneFound}</p>
+                <p>{L.noneHint}</p>
                 <a
                   href={mapsSearchPoliceUrl(coords)}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 bg-[#0A2E65] text-white rounded-lg font-bold"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> Search police stations in Google Maps
+                  <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> {L.searchMaps}
                 </a>
               </div>
             ) : (
@@ -157,14 +159,14 @@ export const NearbyPoliceCard: React.FC = () => {
                       </div>
                       <p className="flex items-start gap-1.5">
                         <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-red-700" aria-hidden="true" />
-                        <span>{s.address || 'Address not available'}</span>
+                        <span>{s.address || L.addrNA}</span>
                       </p>
-                      {s.phone && <p className="font-mono">Phone: {s.phone}</p>}
+                      {s.phone && <p className="font-mono">{fill(L.phoneLbl, { p: s.phone })}</p>}
                       {s.openingHours && s.openingHours.length > 0 && (
                         <details>
                           <summary className="cursor-pointer font-bold flex items-center gap-1.5">
                             <Clock className="w-3.5 h-3.5" aria-hidden="true" />
-                            Opening hours{typeof s.openNow === 'boolean' ? (s.openNow ? ' · Open now' : ' · Closed now') : ''}
+                            {L.openingHours}{typeof s.openNow === 'boolean' ? (s.openNow ? ` · ${L.openNow}` : ` · ${L.closedNow}`) : ''}
                           </summary>
                           <ul className="mt-1 ml-5 list-disc">
                             {s.openingHours.map((h) => (
@@ -173,17 +175,17 @@ export const NearbyPoliceCard: React.FC = () => {
                           </ul>
                         </details>
                       )}
-                      {!s.openingHours && <p className="text-slate-600">Opening hours not available</p>}
+                      {!s.openingHours && <p className="text-slate-600">{L.hoursNA}</p>}
                       <div className="flex flex-wrap gap-2 pt-1">
                         <a href={s.mapsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2.5 min-h-11 bg-white border border-slate-300 rounded-lg font-bold text-slate-900">
-                          <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> View on Map
+                          <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> {L.viewMap}
                         </a>
                         <a href={s.directionsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2.5 min-h-11 bg-[#0A2E65] text-white rounded-lg font-bold">
-                          <Navigation className="w-3.5 h-3.5" aria-hidden="true" /> Get Directions
+                          <Navigation className="w-3.5 h-3.5" aria-hidden="true" /> {L.getDirections}
                         </a>
                         {tel && (
                           <a href={tel} className="inline-flex items-center gap-1.5 px-3 py-2.5 min-h-11 bg-red-700 text-white rounded-lg font-bold">
-                            <Phone className="w-3.5 h-3.5" aria-hidden="true" /> Call Police Station
+                            <Phone className="w-3.5 h-3.5" aria-hidden="true" /> {L.callPolice}
                           </a>
                         )}
                       </div>
@@ -193,17 +195,14 @@ export const NearbyPoliceCard: React.FC = () => {
               </ul>
             )}
             <p className="text-[11px] text-slate-600 leading-relaxed">
-              Station details come from the map provider and may be out of date. Opening a map or dialler does not contact
-              or notify anyone until you place the call yourself.
+              {L.pDisclaimer}
             </p>
           </>
         )}
 
-        {phase === 'error' && coords && (
-          <a href={mapsSearchPoliceUrl(coords)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900">
-            <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> Search police stations in Google Maps instead
-          </a>
-        )}
+        <a href={mapsSearchPoliceUrl(coords || undefined)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900">
+          <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> {L.searchMaps} in Google Maps
+        </a>
       </div>
     </section>
   );

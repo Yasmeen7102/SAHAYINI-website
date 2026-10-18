@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Crosshair, Loader2, AlertTriangle, ExternalLink, Send, Copy, Check, Share2, Info, Camera, ImagePlus, RefreshCw, Trash2, Phone, Navigation, Download } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { getLocationStrings, fill, LocationStrings } from '../../i18n/locationStrings';
 import { mapsLink, smsHref, whatsappHref, isIndianMobile } from '../../utils/emergencyShare';
 import { NearbyStation, fetchNearbyPolice, NearbyPoliceError, telHref } from '../../utils/nearbyPolice';
 import { CapturedFix, buildCaptureMessage, canShareFiles, cameraErrorMessage, fitWithin, photoFileName } from '../../utils/photoShare';
@@ -13,16 +14,16 @@ type PoliceState =
   | { status: 'none' }
   | { status: 'error'; message: string };
 
-const geoErrorMessage = (err: GeolocationPositionError): string => {
+const geoErrorMessage = (err: GeolocationPositionError, L: LocationStrings): string => {
   switch (err.code) {
     case err.PERMISSION_DENIED:
-      return 'Location permission was denied. Allow location access for this site in your browser settings, then try again.';
+      return L.geoDenied;
     case err.POSITION_UNAVAILABLE:
-      return 'Your location is currently unavailable. Turn on GPS / location services and move to an open area, then try again.';
+      return L.geoUnavailable;
     case err.TIMEOUT:
-      return 'Getting your location took too long. Check GPS or signal and try again.';
+      return L.geoTimeout;
     default:
-      return 'Could not get your location. Please try again.';
+      return L.geoOther;
   }
 };
 
@@ -31,7 +32,8 @@ const geoErrorMessage = (err: GeolocationPositionError): string => {
  * Opening a message app only PREPARES a message. The browser cannot tell whether it was sent.
  */
 export const CaptureLocationCard: React.FC = () => {
-  const { contacts } = useApp();
+  const { contacts, language } = useApp();
+  const L = getLocationStrings(language);
   const [capture, setCapture] = useState<Capture | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +88,7 @@ export const CaptureLocationCard: React.FC = () => {
   useEffect(() => {
     if (cameraOn && videoRef.current && streamRef.current) {
       videoRef.current.srcObject = streamRef.current;
-      videoRef.current.play().catch(() => setPhotoError('The camera preview could not start. Choose an existing photo instead.'));
+      videoRef.current.play().catch(() => setPhotoError(L.previewFail));
     }
   }, [cameraOn]);
 
@@ -110,7 +112,7 @@ export const CaptureLocationCard: React.FC = () => {
       streamRef.current = stream;
       setCameraOn(true);
     } catch (e) {
-      setPhotoError(cameraErrorMessage(e));
+      setPhotoError(cameraErrorMessage(e, language));
     } finally {
       setCameraStarting(false);
     }
@@ -119,7 +121,7 @@ export const CaptureLocationCard: React.FC = () => {
   const takeSnapshot = () => {
     const v = videoRef.current;
     if (!v || !v.videoWidth || !v.videoHeight) {
-      setPhotoError('The camera is not ready yet. Wait a moment and try again.');
+      setPhotoError(L.cameraNotReady);
       return;
     }
     const { width, height } = fitWithin(v.videoWidth, v.videoHeight, 1600);
@@ -130,7 +132,7 @@ export const CaptureLocationCard: React.FC = () => {
     canvas.toBlob(
       (blob) => {
         if (!blob) {
-          setPhotoError('Could not save the photo. Please try again or choose an existing photo.');
+          setPhotoError(L.saveFail);
           return;
         }
         replacePhoto(new File([blob], photoFileName(new Date()), { type: 'image/jpeg' }));
@@ -147,7 +149,7 @@ export const CaptureLocationCard: React.FC = () => {
     e.target.value = ''; // allow choosing the same file again
     if (!f) return;
     if (!f.type.startsWith('image/')) {
-      setPhotoError('Please choose an image file.');
+      setPhotoError(L.pickImage);
       return;
     }
     stopCamera();
@@ -212,7 +214,7 @@ export const CaptureLocationCard: React.FC = () => {
       (err) => {
         if (id !== requestId.current) return;
         setBusy(false);
-        setError(geoErrorMessage(err));
+        setError(geoErrorMessage(err, L));
       },
       // maximumAge 0 = never reuse a cached position; always a fresh fix.
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -223,7 +225,7 @@ export const CaptureLocationCard: React.FC = () => {
   // Only a real mobile number can receive SMS (landlines cannot).
   const policeSmsPhone = policeStation?.phone?.split(/[;,/]/).map((x) => x.trim()).find((x) => isIndianMobile(x)) || '';
   const link = capture ? mapsLink(capture) : '';
-  const message = capture ? buildCaptureMessage(capture, policeStation) : '';
+  const message = capture ? buildCaptureMessage(capture, policeStation, language) : '';
 
   const chosen = contacts.filter((c) => selected.has(c.id));
   const toggle = (id: string) =>
@@ -237,17 +239,17 @@ export const CaptureLocationCard: React.FC = () => {
     try {
       await navigator.clipboard.writeText(message);
       setCopied(true);
-      setNotice('Message copied. You still need to paste and send it yourself.');
+      setNotice(L.copied);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      setNotice('Could not copy automatically. Please select and copy the message text above.');
+      setNotice(L.copyFail);
     }
   };
 
   const requireConsent = (e?: React.SyntheticEvent): boolean => {
     if (consent) return true;
     e?.preventDefault();
-    setNotice('Please tick the confirmation box first. Nothing is shared until you confirm.');
+    setNotice(L.tickConsent);
     return false;
   };
 
@@ -258,19 +260,15 @@ export const CaptureLocationCard: React.FC = () => {
     const files = photo ? [photo.file] : [];
     const withFile = photo ? canShareFiles(files) : false;
     try {
-      await navigator.share(withFile ? { title: 'My location', text: message, files } : { title: 'My location', text: message });
+      await navigator.share(withFile ? { title: L.capTitle, text: message, files } : { title: L.capTitle, text: message });
       setNotice(
-        (withFile
-          ? 'The share sheet opened with your photo and location. '
-          : photo
-          ? 'This browser cannot share photos, so only the text and map link were offered. Use “Save photo” and attach it in your messaging app. '
-          : 'The share sheet opened with your location. ') +
-          (recipientNames.length ? `Choose ${recipientNames.join(', ')} there: the share sheet cannot pre-select people. ` : '') +
-          'SAHAYINI cannot tell whether anything was sent. If your app dropped the text, use “Copy message”.'
+        (withFile ? L.shareOpenedPhoto : photo ? L.sharePhotoUnsupported : L.shareOpened) +
+          (recipientNames.length ? fill(L.shareChoose, { names: recipientNames.join(', ') }) : '') +
+          L.shareCantTell
       );
     } catch (e) {
       if ((e as { name?: string })?.name !== 'AbortError') {
-        setNotice('The share sheet could not be opened. Use the SMS, WhatsApp, Copy message and Save photo options instead.');
+        setNotice(L.shareFail);
       }
       /* AbortError = the user closed the share sheet */
     }
@@ -284,9 +282,9 @@ export const CaptureLocationCard: React.FC = () => {
             <Crosshair className="w-5 h-5" aria-hidden="true" />
           </div>
           <div>
-            <h3 id="capture-loc-title" className="text-base font-bold text-slate-900">Capture The Location</h3>
+            <h3 id="capture-loc-title" className="text-base font-bold text-slate-900">{L.capTitle}</h3>
             <p className="text-xs text-slate-600">
-              Capture your current GPS location and share it with your trusted emergency contacts.
+              {L.capDesc}
             </p>
           </div>
         </div>
@@ -297,7 +295,7 @@ export const CaptureLocationCard: React.FC = () => {
           className="px-4 py-2.5 min-h-11 bg-[#0A2E65] hover:bg-[#072344] disabled:opacity-70 text-white text-xs font-bold rounded-full transition-colors flex items-center justify-center gap-2 cursor-pointer"
         >
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : null}
-          <span>{busy ? 'Getting GPS fix…' : '📍 Capture & Send My Location'}</span>
+          <span>{busy ? L.capBusy : L.capBtn}</span>
         </button>
       </div>
 
@@ -305,21 +303,21 @@ export const CaptureLocationCard: React.FC = () => {
         {error && (
           <div role="alert" className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-950 flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
-            <span className="leading-relaxed">{error} In danger, call 112.</span>
+            <span className="leading-relaxed">{error} {L.inDanger}</span>
           </div>
         )}
 
         {capture && (
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-xs text-slate-800">
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
-              <div className="flex justify-between gap-2"><dt className="font-bold">Latitude</dt><dd className="font-mono">{capture.lat.toFixed(6)}</dd></div>
-              <div className="flex justify-between gap-2"><dt className="font-bold">Longitude</dt><dd className="font-mono">{capture.lng.toFixed(6)}</dd></div>
-              <div className="flex justify-between gap-2"><dt className="font-bold">Accuracy</dt><dd className="font-mono">±{Math.round(capture.accuracy)} m</dd></div>
-              <div className="flex justify-between gap-2"><dt className="font-bold">Captured at</dt><dd className="font-mono">{capture.capturedAt.toLocaleTimeString()}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="font-bold">{L.lat}</dt><dd className="font-mono">{capture.lat.toFixed(6)}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="font-bold">{L.lng}</dt><dd className="font-mono">{capture.lng.toFixed(6)}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="font-bold">{L.accuracy}</dt><dd className="font-mono">±{Math.round(capture.accuracy)} m</dd></div>
+              <div className="flex justify-between gap-2"><dt className="font-bold">{L.capturedAt}</dt><dd className="font-mono">{capture.capturedAt.toLocaleTimeString()}</dd></div>
             </dl>
             {capture.accuracy > 100 && (
               <p className="text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                Accuracy is low (±{Math.round(capture.accuracy)} m). Step outside or enable GPS and capture again for a better fix.
+                {fill(L.lowAccuracy, { m: Math.round(capture.accuracy) })}
               </p>
             )}
 
@@ -328,24 +326,24 @@ export const CaptureLocationCard: React.FC = () => {
             </a>
 
             <div>
-              <p className="font-bold mb-1">Prepared emergency message</p>
+              <p className="font-bold mb-1">{L.preparedMsg}</p>
               <p className="p-2.5 bg-white rounded-xl border border-slate-200 leading-relaxed break-words select-all">{message}</p>
             </div>
 
             {/* Photo (part of this location feature) */}
             <div className="space-y-2">
-              <p className="font-bold">Add a photo of where you are (optional)</p>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={onPickFile} className="sr-only" aria-label="Choose an existing photo" tabIndex={-1} />
+              <p className="font-bold">{L.addPhoto}</p>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={onPickFile} className="sr-only" aria-label={L.choosePhotoAria} tabIndex={-1} />
 
               {cameraOn && (
                 <div className="space-y-2">
-                  <video ref={videoRef} playsInline muted className="w-full max-h-72 rounded-xl bg-black object-contain" aria-label="Live camera preview" />
+                  <video ref={videoRef} playsInline muted className="w-full max-h-72 rounded-xl bg-black object-contain" aria-label={L.cameraAria} />
                   <div className="flex flex-wrap gap-2">
                     <button type="button" onClick={takeSnapshot} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold text-white bg-[#0A2E65] cursor-pointer">
-                      <Camera className="w-3.5 h-3.5" aria-hidden="true" /> Take photo
+                      <Camera className="w-3.5 h-3.5" aria-hidden="true" /> {L.takePhoto}
                     </button>
                     <button type="button" onClick={stopCamera} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-800 cursor-pointer">
-                      Cancel
+                      {L.cancel}
                     </button>
                   </div>
                 </div>
@@ -353,8 +351,8 @@ export const CaptureLocationCard: React.FC = () => {
 
               {photo && !cameraOn && (
                 <div className="space-y-2">
-                  <img src={photo.url} alt="Preview of the photo you will share" className="w-full max-h-72 rounded-xl border border-slate-200 bg-white object-contain" />
-                  <p className="text-[11px] text-slate-600">{photo.file.name} · {(photo.file.size / 1024).toFixed(0)} KB · stays on this device until you choose to share it</p>
+                  <img src={photo.url} alt={L.photoAlt} className="w-full max-h-72 rounded-xl border border-slate-200 bg-white object-contain" />
+                  <p className="text-[11px] text-slate-600">{fill(L.photoStays, { name: photo.file.name, kb: (photo.file.size / 1024).toFixed(0) })}</p>
                 </div>
               )}
 
@@ -362,18 +360,18 @@ export const CaptureLocationCard: React.FC = () => {
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={startCamera} disabled={cameraStarting} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-800 cursor-pointer">
                     {cameraStarting ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : photo ? <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> : <Camera className="w-3.5 h-3.5" aria-hidden="true" />}
-                    {photo ? 'Retake photo' : 'Take a photo'}
+                    {photo ? L.retake : L.takeAPhoto}
                   </button>
                   <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-800 cursor-pointer">
-                    <ImagePlus className="w-3.5 h-3.5" aria-hidden="true" /> Choose existing photo
+                    <ImagePlus className="w-3.5 h-3.5" aria-hidden="true" /> {L.chooseExisting}
                   </button>
                   {photo && (
                     <>
                       <a href={photo.url} download={photo.file.name} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-800">
-                        <Download className="w-3.5 h-3.5" aria-hidden="true" /> Save photo
+                        <Download className="w-3.5 h-3.5" aria-hidden="true" /> {L.savePhoto}
                       </a>
                       <button type="button" onClick={removePhoto} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold bg-white border border-red-300 text-red-800 cursor-pointer">
-                        <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Remove photo
+                        <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> {L.removePhoto}
                       </button>
                     </>
                   )}
@@ -388,16 +386,16 @@ export const CaptureLocationCard: React.FC = () => {
               )}
               {photo && !canShareFiles([photo.file]) && (
                 <p className="text-[11px] text-slate-700 leading-relaxed">
-                  This browser cannot attach photos to a share sheet. Tap “Save photo”, then attach it manually in your messaging app. SMS cannot carry photos.
+                  {L.noShareFiles}
                 </p>
               )}
             </div>
 
             <fieldset>
-              <legend className="font-bold mb-1.5">Choose who to send it to</legend>
+              <legend className="font-bold mb-1.5">{L.chooseWho}</legend>
               {contacts.length === 0 ? (
                 <p className="text-amber-950 bg-amber-50 border border-amber-300 rounded-xl p-2.5">
-                  No emergency contacts saved. Add them under “Trusted Emergency Contacts” below.
+                  {L.noContacts}
                 </p>
               ) : (
                 <ul className="space-y-1.5">
@@ -423,33 +421,33 @@ export const CaptureLocationCard: React.FC = () => {
             <div className="p-3 rounded-xl border border-slate-200 bg-white space-y-2">
               <label className="flex items-center gap-2.5 min-h-11 cursor-pointer">
                 <input type="checkbox" checked={includePolice} onChange={togglePolice} className="w-4 h-4 accent-[#0A2E65]" />
-                <span className="font-bold text-slate-900">Also include the nearest police station</span>
+                <span className="font-bold text-slate-900">{L.includePolice}</span>
               </label>
               {includePolice && police.status === 'loading' && (
-                <p className="flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Looking up the nearest police station…</p>
+                <p className="flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> {L.lookingUp}</p>
               )}
               {includePolice && police.status === 'error' && (
                 <p role="alert" className="text-amber-950 bg-amber-50 border border-amber-300 rounded-lg p-2 leading-relaxed">
                   {police.message}{' '}
-                  <button type="button" onClick={() => capture && loadPolice(capture)} className="underline font-bold cursor-pointer">Try again</button>
+                  <button type="button" onClick={() => capture && loadPolice(capture)} className="underline font-bold cursor-pointer">{L.tryAgain}</button>
                 </p>
               )}
               {includePolice && police.status === 'none' && (
                 <p className="text-slate-800 leading-relaxed">
-                  No police station was found near you in the map data. Call <a href="tel:112" className="font-extrabold underline">112</a>, or use “Find Nearby Police Stations” below.
+                  {L.noStationA}<a href="tel:112" className="font-extrabold underline">112</a>{L.noStationB}
                 </p>
               )}
               {policeStation && (
                 <div className="space-y-2">
                   <div>
                     <p className="font-bold text-slate-900">{policeStation.name} · {policeStation.distanceKm.toFixed(1)} km</p>
-                    <p>{policeStation.address || 'Address not available'}</p>
-                    <p className="font-mono">{policeStation.phone ? `Phone: ${policeStation.phone}` : 'No verified phone number is listed for this station.'}</p>
+                    <p>{policeStation.address || L.addrNA}</p>
+                    <p className="font-mono">{policeStation.phone ? fill(L.phoneLbl, { p: policeStation.phone }) : L.noPhone}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {policeStation.phone && telHref(policeStation.phone) && (
                       <a href={telHref(policeStation.phone)} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold text-white bg-red-700 hover:bg-red-800">
-                        <Phone className="w-3.5 h-3.5" aria-hidden="true" /> Call station
+                        <Phone className="w-3.5 h-3.5" aria-hidden="true" /> {L.callStation}
                       </a>
                     )}
                     {policeSmsPhone && (
@@ -457,19 +455,19 @@ export const CaptureLocationCard: React.FC = () => {
                         href={smsHref([policeSmsPhone], message)}
                         onClick={(e) => {
                           if (!requireConsent(e)) return;
-                          setNotice('Opened your SMS app with a text message (no photo) addressed to the station. It has NOT been sent until you tap Send, and the station has not necessarily received or read it.');
+                          setNotice(L.smsStationOpened);
                         }}
                         className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold text-white bg-blue-700 hover:bg-blue-800"
                       >
-                        <Send className="w-3.5 h-3.5" aria-hidden="true" /> SMS station (text only)
+                        <Send className="w-3.5 h-3.5" aria-hidden="true" /> {L.smsStation}
                       </a>
                     )}
                     <a href={policeStation.directionsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-800">
-                      <Navigation className="w-3.5 h-3.5" aria-hidden="true" /> Directions
+                      <Navigation className="w-3.5 h-3.5" aria-hidden="true" /> {L.directions}
                     </a>
                   </div>
                   <p className="text-[11px] text-slate-700 leading-relaxed">
-                    Station details come from the map provider and may be out of date. SMS and calls cannot carry a photo; to send the photo too, use “Share photo + location” and choose the station there if you have its WhatsApp or email. SAHAYINI has no link to the police: nothing here reaches them unless you send it or call yourself.
+                    {L.stationDisclaimer}
                   </p>
                 </div>
               )}
@@ -477,14 +475,14 @@ export const CaptureLocationCard: React.FC = () => {
 
             {!online && (
               <p className="text-amber-950 bg-amber-50 border border-amber-300 rounded-lg p-2 leading-relaxed">
-                You appear to be offline. SMS can still work, but map links and the police lookup need internet.
+                {L.offline}
               </p>
             )}
 
             <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-300 bg-white cursor-pointer">
               <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="w-4 h-4 mt-0.5 accent-[#0A2E65]" />
               <span className="leading-relaxed">
-                <strong>I agree to share</strong> my GPS location{photo ? ' and this photo' : ''} with the people I choose. The photo stays on this device; SAHAYINI does not upload it. It leaves only through the app I pick.
+                <strong>{L.consentStrong}</strong>{fill(L.consentRest, { photo: photo ? L.consentPhoto : '' })}
               </span>
             </label>
 
@@ -496,16 +494,14 @@ export const CaptureLocationCard: React.FC = () => {
                   if (!requireConsent(e)) return;
                   if (!chosen.length) {
                     e.preventDefault();
-                    setNotice('Select at least one contact first.');
+                    setNotice(L.selectContact);
                     return;
                   }
-                  setNotice(
-                    `Opened your SMS app with a text message (no photo) to ${chosen.length} contact${chosen.length > 1 ? 's' : ''}. It has NOT been sent yet: review it and tap Send. SAHAYINI cannot confirm delivery.${photo ? ' To include the photo, use “Share photo + location” or save it and attach it yourself.' : ''}`
-                  );
+                  setNotice(fill(L.smsContactsOpened, { n: chosen.length }) + (photo ? L.smsPhotoHint : ''));
                 }}
                 className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold text-white ${chosen.length ? 'bg-blue-700 hover:bg-blue-800' : 'bg-slate-400 cursor-not-allowed'}`}
               >
-                <Send className="w-3.5 h-3.5" aria-hidden="true" /> Open SMS app
+                <Send className="w-3.5 h-3.5" aria-hidden="true" /> {L.openSms}
               </a>
 
               {chosen.filter((c) => isIndianMobile(c.phone)).map((c) => (
@@ -516,27 +512,27 @@ export const CaptureLocationCard: React.FC = () => {
                   rel="noreferrer"
                   onClick={(e) => {
                     if (!requireConsent(e)) return;
-                    setNotice(`Opened WhatsApp with a text draft for ${c.name} (WhatsApp links cannot attach the photo). It has NOT been sent until you tap Send there.`);
+                    setNotice(fill(L.waOpened, { name: c.name }));
                   }}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800"
                 >
-                  WhatsApp {c.name}
+                  {fill(L.whatsapp, { name: c.name })}
                 </a>
               ))}
 
               {typeof navigator !== 'undefined' && 'share' in navigator && (
                 <button type="button" onClick={nativeShare} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-800 cursor-pointer">
-                  <Share2 className="w-3.5 h-3.5" aria-hidden="true" /> {photo ? 'Share photo + location…' : 'Share…'}
+                  <Share2 className="w-3.5 h-3.5" aria-hidden="true" /> {photo ? L.sharePhoto : L.share}
                 </button>
               )}
 
               <button type="button" onClick={copy} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-800 cursor-pointer">
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
-                Copy message
+                {L.copyMsg}
               </button>
 
               <button type="button" onClick={capturePosition} disabled={busy} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-800 cursor-pointer">
-                Recapture
+                {L.recapture}
               </button>
             </div>
 
@@ -549,9 +545,7 @@ export const CaptureLocationCard: React.FC = () => {
         <p className="text-[11px] text-slate-600 flex items-start gap-1.5 leading-relaxed">
           <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
           <span>
-            Opening your SMS, WhatsApp or share app only prepares a message. Nothing is sent until you tap Send there, and
-            SAHAYINI cannot confirm that it was delivered. Taking a photo or opening a share screen does not alert the police or
-            emergency services. In danger, call 112.
+            {L.footer}
           </span>
         </p>
       </div>

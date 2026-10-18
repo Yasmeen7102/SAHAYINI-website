@@ -88,3 +88,8 @@ Verification note: confirmed 8 suggestion arrays with 20 entries each and confir
 - The image preview and download are available offline because the selected file remains local to the current browser session. The generated complaint draft records the photo filename as a separately attached piece of evidence.
 - The photo is not automatically uploaded or sent. Users must download/share it separately alongside the complaint draft.
 - Existing capture-location photo sharing, offline scam-pattern checks, online AI scam analysis, and language selection were retained.
+
+## Localization round (see LOCALIZATION_AUDIT.md)
+New: src/i18n/{sosStrings,locationStrings,scamStrings,legalLocalized}.ts, LOCALIZATION_AUDIT.md.
+Modified: SosView, ScamProtectionView, CaptureLocationCard, NearbyPoliceCard, LiveLocationShare, LessonReaderModal,
+data/lessonsData.ts, utils/emergencyShare.ts, utils/photoShare.ts. Lesson bodies in legalLessons.ts still English.

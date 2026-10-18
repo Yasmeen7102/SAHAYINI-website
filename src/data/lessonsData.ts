@@ -1,5 +1,6 @@
 import { LanguageCode, LessonItem, QuizQuestion } from '../types';
 import { EXTRA_LESSONS, EXTRA_TOPICS } from './legalLessons';
+import { getLegalLocalized } from '../i18n/legalLocalized';
 
 export interface TopicItem {
   id: string;
@@ -1818,13 +1819,20 @@ export function getTopicsForLang(lang: LanguageCode): TopicItem[] {
   // Keep the existing "More" card last; add the new topics before it.
   const more = base.filter((tp) => tp.id === 'more-skills');
   const rest = base.filter((tp) => tp.id !== 'more-skills');
-  return [...rest, ...EXTRA_TOPICS, ...more];
+  const loc = getLegalLocalized(lang);
+  const extra = EXTRA_TOPICS.map((tp) => (loc?.topics[tp.id] ? { ...tp, ...loc.topics[tp.id] } : tp));
+  return [...rest, ...extra, ...more];
 }
 
 export function getLessonsForLang(lang: LanguageCode): LessonItem[] {
   const base = FEATURED_LESSONS_BY_LANG[lang] || FEATURED_LESSONS_BY_LANG.en;
   // Women's safety, scholarship, banking and law lessons (English text, shown in every language)
-  return [...base, ...EXTRA_LESSONS];
+  const loc = getLegalLocalized(lang);
+  const extra = EXTRA_LESSONS.map((l) => {
+    const t = loc?.lessons[l.id];
+    return t ? { ...l, title: `${l.number}. ${t.title}`, description: t.description } : l;
+  });
+  return [...base, ...extra];
 }
 
 export function getQuizzesForLang(lang: LanguageCode): QuizQuestion[] {

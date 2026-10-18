@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Logo } from '../common/Logo';
 import { getExtraStrings } from '../../i18n/extraStrings';
+import { getScamPageStrings } from '../../i18n/scamStrings';
 import { useExclusiveSpeech } from '../../hooks/useExclusiveSpeech';
 import {
   analyzeScamMessage,
@@ -32,6 +33,7 @@ import {
 export const ScamProtectionView: React.FC = () => {
   const { t, language } = useApp();
   const extra = getExtraStrings(language);
+  const sp = getScamPageStrings(language);
   const speech = useExclusiveSpeech();
 
   const [inputContent, setInputContent] = useState('');
@@ -70,43 +72,7 @@ export const ScamProtectionView: React.FC = () => {
     speakResult(result);
   };
 
-  const scamPlaybooks = [
-    {
-      id: 'digital-arrest',
-      title: '1. "Digital Arrest" & Video Call Blackmail',
-      summary: 'Fraudsters impersonate CBI, Police, or FedEx officials demanding money transfers over Skype/WhatsApp video calls.',
-      details: 'Criminals wear fake police uniforms and claim an intercepted parcel with illegal narcotics has your Aadhaar number. They threaten an arrest warrant unless you transfer money to a "Supreme Court verification account". Remember: No court, police station, or investigative agency in India ever puts citizens under arrest over video calls, and NEVER asks for funds.',
-      warning: 'Disconnect video calls immediately and dial 1930.',
-    },
-    {
-      id: 'electricity-bill',
-      title: '2. Electricity Disconnection SMS Scam',
-      summary: 'SMS claiming power cut tonight at 9:30 PM unless a private number is called.',
-      details: 'Electricity boards (like TANGEDCO, MSEDCL, BESCOM) never send disconnection threats from 10-digit private numbers. When you call, fraudsters ask you to download remote desktop apps (AnyDesk, QuickSupport) to take over your bank account.',
-      warning: 'Never call personal phone numbers sent in electricity messages.',
-    },
-    {
-      id: 'upi-qr-fraud',
-      title: '3. QR Code & UPI PIN Reverse Fraud',
-      summary: 'Scammers on OLX or WhatsApp send a QR code claiming it will "deposit" money into your account.',
-      details: 'You never have to enter your UPI PIN or scan a QR code to RECEIVE money. Entering your PIN ALWAYS transfers money OUT of your bank account.',
-      warning: 'Entering your UPI PIN only sends money out—never receives.',
-    },
-    {
-      id: 'part-time-job',
-      title: '4. Telegram Part-Time Job / YouTube Like Scam',
-      summary: 'Offers ₹2,000 to ₹5,000 daily for liking YouTube videos or Google reviews, then traps you in crypto deposits.',
-      details: 'Fraudsters pay ₹150 for the first 3 tasks to build trust, then require you to deposit ₹10,000+ into fake crypto accounts to unlock "commissions". You can never withdraw the deposited money.',
-      warning: 'No genuine company asks you to deposit money in order to work.',
-    },
-    {
-      id: 'fake-loan-apps',
-      title: '5. Instant Loan App Harassment',
-      summary: 'Unregulated instant loan apps that steal your contact list and photo gallery.',
-      details: 'Predatory apps promise instant ₹5,000 loans with no credit check. Upon install, they upload your entire phonebook and photos to private servers, then extort you with morphed photos.',
-      warning: 'Only borrow from RBI-registered banks and NBFCs.',
-    },
-  ];
+  const scamPlaybooks = sp.lessons;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -134,7 +100,7 @@ export const ScamProtectionView: React.FC = () => {
               {t.scam.analyzerTitle}
             </h2>
             <p className="text-xs text-slate-500">
-              Paste any suspicious SMS, WhatsApp message, email, or web link to inspect for fraud patterns.
+              {t.scam.analyzerDesc}
             </p>
           </div>
         </div>
@@ -144,7 +110,7 @@ export const ScamProtectionView: React.FC = () => {
             rows={4}
             value={inputContent}
             onChange={(e) => setInputContent(e.target.value)}
-            placeholder="Paste suspicious message or URL here (e.g. 'Your electricity will be cut off...')"
+            placeholder={t.scam.textareaPlaceholder}
             className="w-full p-3.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-hidden focus:ring-2 focus:ring-[#0A2E65] transition-all"
           />
         </div>
@@ -152,7 +118,7 @@ export const ScamProtectionView: React.FC = () => {
         {/* Quick sample chips */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            Try Sample:
+            {t.scam.trySample}
           </span>
           {sampleScams.map((sample, idx) => (
             <button
@@ -160,7 +126,7 @@ export const ScamProtectionView: React.FC = () => {
               onClick={() => setInputContent(sample)}
               className="text-[11px] text-slate-600 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-full transition-colors truncate max-w-[200px] cursor-pointer"
             >
-              Sample {idx + 1}
+              {sp.sample.replace('{n}', String(idx + 1))}
             </button>
           ))}
         </div>
@@ -177,7 +143,7 @@ export const ScamProtectionView: React.FC = () => {
           {analyzing ? (
             <>
               <Sparkles className="w-4 h-4 animate-spin" />
-              <span>Analyzing Fraud Signals...</span>
+              <span>{t.scam.analyzingBtn}</span>
             </>
           ) : (
             <>
@@ -329,13 +295,13 @@ export const ScamProtectionView: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <span className="px-2.5 py-0.5 bg-white/20 text-blue-100 text-[11px] font-bold rounded-full uppercase tracking-wider">
-              Official Government Portals
+              {sp.portalsBadge}
             </span>
             <h2 className="text-xl sm:text-2xl font-black mt-2">
-              National Cyber Crime Reporting Hub
+              {t.scam.reportCybercrime}
             </h2>
             <p className="text-xs sm:text-sm text-blue-200 mt-1 max-w-xl">
-              If you have lost money or faced online extortion, report within the <strong>Golden Hour (2 to 3 hours)</strong> to prevent fraudsters from siphoning funds.
+              {t.scam.goldenHourNotice}
             </p>
           </div>
 
@@ -344,7 +310,7 @@ export const ScamProtectionView: React.FC = () => {
             className="px-6 py-3.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-sm rounded-full shadow-md flex items-center justify-center gap-2 shrink-0 transition-transform hover:scale-105"
           >
             <PhoneCall className="w-4 h-4" />
-            <span>DIAL 1930 HELPLINE</span>
+            <span>{t.scam.dial1930Btn}</span>
           </a>
         </div>
 
@@ -356,7 +322,7 @@ export const ScamProtectionView: React.FC = () => {
             className="p-3.5 bg-white/10 hover:bg-white/15 rounded-2xl border border-white/20 flex items-center justify-between transition-colors"
           >
             <div>
-              <p className="font-bold">National Cyber Crime Portal</p>
+              <p className="font-bold">{t.scam.nationalPortal.split(' - ')[1] ?? t.scam.nationalPortal}</p>
               <p className="text-[11px] text-blue-200">cybercrime.gov.in</p>
             </div>
             <ExternalLink className="w-4 h-4 text-blue-300" />
@@ -369,8 +335,8 @@ export const ScamProtectionView: React.FC = () => {
             className="p-3.5 bg-white/10 hover:bg-white/15 rounded-2xl border border-white/20 flex items-center justify-between transition-colors"
           >
             <div>
-              <p className="font-bold">Chakshu Portal (DoT)</p>
-              <p className="text-[11px] text-blue-200">Report fraudulent SMS & numbers</p>
+              <p className="font-bold">{t.scam.chakshuPortal.split(' - ')[0]}</p>
+              <p className="text-[11px] text-blue-200">{t.scam.chakshuPortal.split(' - ')[1] ?? ''}</p>
             </div>
             <ExternalLink className="w-4 h-4 text-blue-300" />
           </a>
@@ -383,7 +349,7 @@ export const ScamProtectionView: React.FC = () => {
           {t.scam.commonScams}
         </h2>
         <p className="text-xs text-slate-500">
-          Learn how today's fraudsters operate so you can protect yourself, family members, and classmates.
+          {t.scam.commonScamsDesc}
         </p>
 
         <div className="space-y-3">

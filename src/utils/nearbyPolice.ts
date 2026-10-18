@@ -35,8 +35,8 @@ export class NearbyPoliceError extends Error {
   }
 }
 
-export const mapsSearchPoliceUrl = (c: Coords) =>
-  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('police station')}%20near%20${c.lat},${c.lng}`;
+export const mapsSearchPoliceUrl = (c?: Coords | null) =>
+  c ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('police station')}%20near%20${c.lat},${c.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('police stations near me')}`;
 
 export const stationMapUrl = (s: { lat: number; lng: number; name: string }) =>
   `https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`;

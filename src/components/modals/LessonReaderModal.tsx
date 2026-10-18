@@ -1,3 +1,4 @@
+import { getLegalLocalized } from '../../i18n/legalLocalized';
 import React, { useState, useEffect, useRef } from 'react';
 import { LessonItem } from '../../types';
 import { useApp } from '../../context/AppContext';
@@ -104,6 +105,11 @@ export const LessonReaderModal: React.FC<LessonReaderModalProps> = ({
               {localizedLesson.title}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 font-medium">{localizedLesson.description}</p>
+            {localizedLesson.contentLanguage && localizedLesson.contentLanguage !== language && getLegalLocalized(language) && (
+              <p role="note" className="mt-2 text-[11px] leading-relaxed bg-amber-50 border border-amber-300 text-amber-950 rounded-lg p-2">
+                {getLegalLocalized(language)!.englishOnlyNotice}
+              </p>
+            )}
           </div>
 
           <button
@@ -112,7 +118,7 @@ export const LessonReaderModal: React.FC<LessonReaderModalProps> = ({
               onClose();
             }}
             className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-            aria-label="Close lesson"
+            aria-label={t.schemes.closeBtn}
           >
             <X className="w-5 h-5" />
           </button>
