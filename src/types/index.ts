@@ -24,7 +24,9 @@ export type ActiveTab =
   | 'scam'
   | 'complaint'
   | 'profile'
-  | 'settings';
+  | 'settings'
+  | 'exams'
+  | 'location';
 
 export interface UserProfile {
   id: string;

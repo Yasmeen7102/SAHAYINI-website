@@ -11,12 +11,12 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "check:ai": "tsx scripts/check-gemini.ts",
-    "test": "tsx src/utils/core.test.ts && tsx src/utils/update.test.ts && tsx src/utils/photoShare.test.ts && tsx src/utils/complaint.test.ts"
+    "test": "tsx src/utils/core.test.ts && tsx src/utils/update.test.ts && tsx src/utils/photoShare.test.ts && tsx src/utils/complaint.test.ts && tsx src/utils/examProgress.test.ts && tsx src/utils/sosDashboard.test.ts && tsx src/utils/voiceAndPolice.test.ts && tsx src/utils/policeMaps.test.ts && tsx src/utils/askKnowledge.test.ts && tsx src/utils/askChat.test.ts"
   },
   "dependencies": {
-    "@capacitor/android": "^8.5.3",
-    "@capacitor/cli": "^8.5.3",
-    "@capacitor/core": "^8.5.3",
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",

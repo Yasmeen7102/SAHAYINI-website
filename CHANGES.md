@@ -93,3 +93,33 @@ Verification note: confirmed 8 suggestion arrays with 20 entries each and confir
 New: src/i18n/{sosStrings,locationStrings,scamStrings,legalLocalized}.ts, LOCALIZATION_AUDIT.md.
 Modified: SosView, ScamProtectionView, CaptureLocationCard, NearbyPoliceCard, LiveLocationShare, LessonReaderModal,
 data/lessonsData.ts, utils/emergencyShare.ts, utils/photoShare.ts. Lesson bodies in legalLessons.ts still English.
+
+## Round 5 — SOS layout, police search, live sharing on Share Location, multilingual voice monitor
+- SOS page: Call 112 is red; the Offline Safety & Emergency Kit is a blue/purple card with a green button directly under the
+  main SOS card; Share Location, Capture, Find Nearby Police, Emergency Contacts follow below it.
+- Find Nearby Police Stations / Find Your Police Station (SOS, Share Your Location, Complaint & FIR): one shared behaviour
+  (src/utils/policeMaps.ts + src/hooks/usePoliceSearch.ts). The click opens Google Maps at once using the latest GPS fix, or a general
+  "police stations near me" search if GPS is unavailable; it never waits for /api/nearby-police. The in-page station list is an optional
+  background extra and fails silently. Large red errors removed; small neutral messages in 8 languages (src/i18n/policeMapsStrings.ts).
+- Share Your Location: added the same Start/Stop live sharing card as SOS (LiveShareCard + useLiveLocation). Capture and photo features unchanged.
+- Voice monitor: recognition locale follows the selected language; phrase lists + Unicode normalisation for all 8 languages;
+  up to 3 recogniser alternatives checked; "Monitoring Active" shows only when a detector is really running; clear messages for
+  unsupported browser/language. Countdown, cancel, loud-sound detection, contacts and location flow unchanged.
+- Tests: src/utils/voiceAndPolice.test.ts, src/utils/policeMaps.test.ts (added to `npm test`).
+- Non-English text added this round needs native-speaker review (phrase lists especially).
+
+## Round 6 — Ask SAHAYINI only (instant offline answers, faster online answers, text first, Listen/Stop)
+- Instant answers: the 20 suggested questions (tapped, typed or spoken, in any of the 8 languages) are answered on the device in the
+  SELECTED language with no network wait, online or offline (src/services/askKnowledge.ts). Offline, precise multilingual topic keywords
+  can also find a saved answer; otherwise the existing "no saved answer" message is shown. No unrelated or invented answers.
+  Old English-only keyword matching (e.g. "help", "pin") that returned unrelated English text was replaced.
+- Online speed: /api/chat now streams the answer (words appear as they are written), uses minimal "thinking", goes straight to the next
+  model on overload (the 700 ms sleep + same-model retry was removed), has hard time limits, shorter answers and shorter history
+  (chatEngine.ts, src/utils/chatStream.ts, server.ts /api/chat only). Plain JSON is still supported.
+- Text first: answers are never spoken automatically. Each answer has Listen; while playing it becomes Stop. Playback uses the
+  selected language's voice, reads in short pieces, and says so if the device has no voice for that language (src/utils/askSpeech.ts).
+- Microphone: locale follows the selected language; clear localized messages for denied permission, no internet, unsupported
+  language/browser and no speech heard.
+- Tests added: askKnowledge.test.ts, askChat.test.ts (both in `npm test`). update.test.ts assertion adjusted: saved answers are now plain
+  text in the selected language (previously an English label and ** markdown were inside every answer).
+- Non-English text added this round (keywords, UI messages) needs native-speaker review.

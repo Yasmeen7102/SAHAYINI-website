@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ChatMessage, LanguageCode } from '../../types';
-import { getBestVoiceForLanguage } from '../../utils/speechUtils';
+import { speakAnswer, stopSpeaking } from '../../utils/askSpeech';
+import { readChatStream } from '../../utils/chatStream';
+import { findLocalAnswer } from '../../services/askKnowledge';
 import { LOCALIZED_VOICE_ASSISTANT } from '../../i18n/translations';
 import { offlineStorage } from '../../services/offlineStorage';
 import { getExtraStrings } from '../../i18n/extraStrings';
@@ -61,6 +63,12 @@ export const AskSahayiniView: React.FC = () => {
   const [activeSpeechMsgId, setActiveSpeechMsgId] = useState<string | null>(null);
   const [voiceNotice, setVoiceNotice] = useState<string>('');
   const [readingMessage, setReadingMessage] = useState<string | null>(null);
+  // Id of the answer that is still arriving (text streams in word by word); Listen is offered once it is complete.
+  const [streamingId, setStreamingId] = useState<string | null>(null);
+  // Scam replies are listened to from a shorter spoken summary (and its own language) instead of the full text.
+  const speechOverride = useRef<Record<string, { text: string; lang: LanguageCode }>>({});
+  const idCounter = useRef(0);
+  const newId = (prefix: string) => `${prefix}-${Date.now()}-${++idCounter.current}`;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -94,7 +102,7 @@ export const AskSahayiniView: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Initialize Speech Recognition if supported
+  // Initialize Speech Recognition if supported (locale follows the selected language, for typed-or-spoken questions alike)
   useEffect(() => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -135,41 +143,48 @@ export const AskSahayiniView: React.FC = () => {
         console.warn('Speech recognition error:', event.error);
         setIsListening(false);
         setVoiceStatus('idle');
+        // Tell the person what happened, in their language (most browsers need internet for voice input).
+        const code = event?.error;
+        if (code === 'not-allowed' || code === 'service-not-allowed' || code === 'audio-capture') setVoiceNotice(extra.chatMicDenied);
+        else if (code === 'network') setVoiceNotice(extra.chatMicNetwork);
+        else if (code === 'language-not-supported') setVoiceNotice(extra.chatMicLang);
+        else if (code === 'no-speech') setVoiceNotice(extra.chatMicNoSpeech);
       };
 
       recognition.onend = () => {
         setIsListening(false);
-        if (voiceStatus === 'listening') {
-          setVoiceStatus('idle');
-        }
+        setVoiceStatus((v) => (v === 'listening' ? 'idle' : v));
       };
 
       recognitionRef.current = recognition;
+    } else {
+      recognitionRef.current = null;
     }
 
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.abort();
       }
-      window.speechSynthesis?.cancel();
+      stopSpeaking();
     };
   }, [language]);
 
   const startVoiceInput = () => {
-    if (window.speechSynthesis?.speaking) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-    }
+    // Stop any answer being read aloud before listening to the microphone.
+    stopSpeaking();
+    setIsSpeaking(false);
+    setActiveSpeechMsgId(null);
 
     if (recognitionRef.current) {
       try {
+        setVoiceNotice('');
         setTranscriptPreview('');
         recognitionRef.current.start();
       } catch (err) {
         console.warn('Recognition already active:', err);
       }
     } else {
-      setVoiceNotice('Speech recognition is not supported in this browser. Please type your question in the text box below.');
+      setVoiceNotice(extra.chatMicUnsupported);
     }
   };
 
@@ -177,7 +192,10 @@ export const AskSahayiniView: React.FC = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
+    stopSpeaking();
     setIsListening(false);
+    setIsSpeaking(false);
+    setActiveSpeechMsgId(null);
     setVoiceStatus('idle');
   };
 
@@ -185,66 +203,43 @@ export const AskSahayiniView: React.FC = () => {
     if (recognitionRef.current) {
       recognitionRef.current.abort();
     }
-    window.speechSynthesis?.cancel();
+    stopSpeaking();
     setIsListening(false);
     setIsSpeaking(false);
+    setActiveSpeechMsgId(null);
     setVoiceStatus('idle');
     setTranscriptPreview('');
   };
 
-  // Text-To-Speech for responses
-  const handleSpeakText = (text: string, msgId: string, speakLang: LanguageCode = language) => {
-    if (!('speechSynthesis' in window)) {
-      setVoiceNotice('Text-to-speech is not supported in this browser.');
-      return;
-    }
-
-    if (isSpeaking && activeSpeechMsgId === msgId) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-      setActiveSpeechMsgId(null);
-      setVoiceStatus('idle');
-      return;
-    }
-
-    window.speechSynthesis.cancel();
+  // Listen button: reads one answer aloud, ONLY when the user taps it. Answers are never spoken automatically.
+  const handleListen = async (msgId: string, text: string) => {
+    const override = speechOverride.current[msgId];
+    const speakText = override?.text ?? text;
+    const speakLang = override?.lang ?? language;
     setVoiceNotice('');
-
-    const voiceInfo = getBestVoiceForLanguage(speakLang);
-
-    // Do not silently read another language's voice as if it matched the selected language.
-    if (!voiceInfo.isNativeAvailable && speakLang !== 'en') {
-      setVoiceNotice(t.ask.voiceNotInstalled || t.learn.voiceUnavailableNotice);
-      return;
-    }
-
-    const cleanText = text.replace(/[*#_`]/g, '');
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = voiceInfo.langLocale;
-    if (voiceInfo.voice) {
-      utterance.voice = voiceInfo.voice;
-    }
-    utterance.rate = 0.95;
-
-    utterance.onstart = () => {
-      setIsSpeaking(true);
-      setActiveSpeechMsgId(msgId);
-      setVoiceStatus('speaking');
-    };
-
-    utterance.onend = () => {
+    // Stop whatever is playing (another answer, or this one) and start this one.
+    stopSpeaking();
+    setIsSpeaking(true);
+    setActiveSpeechMsgId(msgId);
+    setVoiceStatus('speaking');
+    const done = () => {
       setIsSpeaking(false);
-      setActiveSpeechMsgId(null);
-      setVoiceStatus('idle');
+      setActiveSpeechMsgId((cur) => (cur === msgId ? null : cur));
+      setVoiceStatus((v) => (v === 'speaking' ? 'idle' : v));
     };
+    const res = await speakAnswer(speakText, speakLang, { onEnd: done });
+    if (!res.ok) {
+      done();
+      if (res.reason === 'unsupported') setVoiceNotice(extra.chatTtsUnsupported);
+      else if (res.reason === 'no_voice') setVoiceNotice(t.ask.voiceNotInstalled || t.learn.voiceUnavailableNotice);
+    }
+  };
 
-    utterance.onerror = () => {
-      setIsSpeaking(false);
-      setActiveSpeechMsgId(null);
-      setVoiceStatus('idle');
-    };
-
-    window.speechSynthesis.speak(utterance);
+  const handleStopListening = () => {
+    stopSpeaking();
+    setIsSpeaking(false);
+    setActiveSpeechMsgId(null);
+    setVoiceStatus((v) => (v === 'speaking' ? 'idle' : v));
   };
 
   const nowLabel = () =>
@@ -254,10 +249,13 @@ export const AskSahayiniView: React.FC = () => {
     const text = (textToSend || inputValue).trim();
     if (!text || isSending) return;
 
+    // A new question always silences any answer that is still being read aloud.
+    handleStopListening();
+
     // On retry the question is already on screen, so don't add it a second time.
     if (!opts?.retry) {
       const userMsg: ChatMessage = {
-        id: Date.now().toString(),
+        id: newId('u'),
         sender: 'user',
         text,
         timestamp: nowLabel(),
@@ -266,16 +264,33 @@ export const AskSahayiniView: React.FC = () => {
     }
     setInputValue('');
     setTranscriptPreview('');
-    setIsSending(true);
-    setVoiceStatus('processing');
 
     const pushBot = (msg: Omit<ChatMessage, 'id' | 'sender' | 'timestamp'>): string => {
-      const id = (Date.now() + 1).toString();
+      const id = newId('b');
       setMessages((prev) => [...prev, { id, sender: 'sahayini', timestamp: nowLabel(), ...msg }]);
       return id;
     };
 
-    // A pasted suspicious message (not a question): analyse it and answer in text AND voice.
+    const deviceOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    // 0) INSTANT, ON-DEVICE ANSWER (no network, no waiting). The 20 suggested questions (typed, tapped or spoken,
+    //    in any of the 8 languages) are answered from saved text in the SELECTED language. When the device is
+    //    offline, precise topic keywords are also used. Nothing here is guessed: no match means no saved answer.
+    const local = findLocalAnswer(text, language, { topics: deviceOffline });
+    if (local) {
+      pushBot(
+        deviceOffline
+          ? { text: local.text, source: 'offline_cache', fallbackReason: 'offline' }
+          : { text: local.text, source: 'knowledge_engine' }
+      );
+      setVoiceStatus('idle');
+      return;
+    }
+
+    setIsSending(true);
+    setVoiceStatus('processing');
+
+    // A pasted suspicious message (not a question): analyse it and answer in text. (Listen is on demand.)
     // Anything phrased as a question goes to the AI chat below.
     if (!/[?？]/.test(text) && looksLikeSuspiciousMessage(text)) {
       try {
@@ -288,9 +303,8 @@ export const AskSahayiniView: React.FC = () => {
           fallbackReason:
             result.source === 'ai' ? undefined : localReason === 'offline' ? 'offline' : 'server_unreachable',
         });
-        const speech = buildScamSpeech(result, language);
-        setVoiceStatus('idle');
-        handleSpeakText(speech.text, id, speech.lang);
+        // Listen reads the shorter spoken summary, in its own language, only if the user taps Listen.
+        speechOverride.current[id] = buildScamSpeech(result, language);
       } finally {
         setIsSending(false);
         setVoiceStatus((v) => (v === 'processing' ? 'idle' : v));
@@ -299,28 +313,21 @@ export const AskSahayiniView: React.FC = () => {
     }
 
     // 1) Device has no connection at all: answer ONLY from on-device knowledge and say so.
-    //    (navigator.onLine is read at send time so it can never be stale.)
-    const answerOffline = () => {
-      const result = offlineStorage.getOfflineChatResult(text, language);
-      if (result.matched) {
-        const id = pushBot({ text: result.text, source: 'offline_cache', fallbackReason: 'offline' });
-        handleSpeakText(result.text, id, language);
-      } else {
-        // No suitable saved answer: be honest instead of pretending to answer.
-        const id = pushBot({ text: extra.chatOfflineNoAnswer, source: 'offline_no_match', fallbackReason: 'offline' });
-        handleSpeakText(extra.chatOfflineNoAnswer, id, language);
-      }
+    //    (navigator.onLine is read at send time so it can never be stale.) The instant matcher above found nothing,
+    //    so be honest instead of pretending to answer.
+    const answerOfflineNoMatch = () => {
+      pushBot({ text: extra.chatOfflineNoAnswer, source: 'offline_no_match', fallbackReason: 'offline' });
     };
 
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      answerOffline();
+    if (deviceOffline) {
+      answerOfflineNoMatch();
       setVoiceStatus('idle');
       setIsSending(false);
       return;
     }
 
-    // 2) Device says it is online: ask the real AI service (with a timeout).
-    //    Only a genuine AI reply is shown as an answer. Any failure becomes a clear error with Retry.
+    // 2) Device says it is online: ask the real AI service. The answer streams in as text; any failure becomes
+    //    a clear error with Retry. Only a genuine AI reply is shown as an answer.
     const pushError = (
       errorKind: 'not_configured' | 'unsupported_model' | 'rate_limit' | 'busy' | 'network',
       errorDetail?: string
@@ -337,8 +344,18 @@ export const AskSahayiniView: React.FC = () => {
           : extra.chatErrBusy;
       pushBot({ text: msg, source: 'error', errorKind, errorDetail, retryText: text });
     };
+    const kindForCode = (code: string, status?: number) =>
+      code === 'no_api_key' || code === 'invalid_api_key'
+        ? 'not_configured'
+        : code === 'model_unavailable'
+        ? 'unsupported_model'
+        : code === 'quota' || status === 429
+        ? 'rate_limit'
+        : code === 'network'
+        ? 'network'
+        : 'busy';
 
-    // Only real AI answers are sent back as history (never errors, offline or built-in text).
+    // Only real AI answers are sent back as history (never errors, offline or built-in text). Kept short for speed.
     let history = messages.filter(
       (m) => !m.id.startsWith('init-') && (m.sender === 'user' || m.source === 'gemini')
     );
@@ -347,7 +364,8 @@ export const AskSahayiniView: React.FC = () => {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    let botId: string | null = null;
 
     try {
       const res = await fetch('/api/chat', {
@@ -356,41 +374,67 @@ export const AskSahayiniView: React.FC = () => {
         body: JSON.stringify({
           message: text,
           language,
-          history: history.slice(-6).map((m) => ({ sender: m.sender, text: m.text })),
+          stream: true,
+          history: history.slice(-4).map((m) => ({ sender: m.sender, text: m.text.slice(0, 500) })),
         }),
         signal: controller.signal,
       });
 
-      let data: any = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
-
-      if (res.ok && data && data.source === 'gemini' && typeof data.reply === 'string' && data.reply.trim()) {
-        // Genuine live AI response: keep it visible as text and read it aloud.
-        const id = pushBot({ text: data.reply, source: 'gemini' });
-        handleSpeakText(data.reply, id, language);
-      } else {
-        const code: string = (data && data.error) || '';
-        if (code === 'no_api_key' || code === 'invalid_api_key') {
-          pushError('not_configured', data?.message);
-        } else if (code === 'model_unavailable') {
-          pushError('unsupported_model', data?.message);
-        } else if (code === 'quota' || res.status === 429) {
-          pushError('rate_limit');
+      const streamed = res.ok && (res.headers.get('content-type') || '').includes('ndjson');
+      if (streamed) {
+        // Show the answer as text while it is still arriving. It is NOT spoken.
+        const result = await readChatStream(res, (partial) => {
+          if (!botId) {
+            const id = newId('b');
+            botId = id;
+            setStreamingId(id);
+            setMessages((prev) => [...prev, { id, sender: 'sahayini', timestamp: nowLabel(), text: partial, source: 'gemini' }]);
+          } else {
+            const id = botId;
+            setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, text: partial } : m)));
+          }
+        });
+        if (result.finished && result.text.trim()) {
+          setStreamingId(null);
         } else {
-          pushError('busy');
+          // The stream broke before finishing: remove the half answer and show an honest error with Retry.
+          if (botId) {
+            const id = botId;
+            setMessages((prev) => prev.filter((m) => m.id !== id));
+          }
+          setStreamingId(null);
+          pushError(kindForCode(result.errorCode || 'busy'));
+        }
+      } else {
+        let data: any = null;
+        try {
+          data = await res.json();
+        } catch {
+          data = null;
+        }
+
+        if (res.ok && data && data.source === 'gemini' && typeof data.reply === 'string' && data.reply.trim()) {
+          pushBot({ text: data.reply, source: 'gemini' });
+        } else {
+          const code: string = (data && data.error) || '';
+          const kind = kindForCode(code, res.status);
+          pushError(kind, kind === 'not_configured' || kind === 'unsupported_model' ? data?.message : undefined);
         }
       }
       setVoiceStatus('idle');
     } catch (err) {
       console.warn('Chat request failed:', err);
+      if (botId) {
+        const id = botId;
+        setMessages((prev) => prev.filter((m) => m.id !== id));
+      }
+      setStreamingId(null);
 
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        // Connection dropped while we were waiting.
-        answerOffline();
+        // Connection dropped while we were waiting: use on-device knowledge only.
+        const again = findLocalAnswer(text, language, { topics: true });
+        if (again) pushBot({ text: again.text, source: 'offline_cache', fallbackReason: 'offline' });
+        else answerOfflineNoMatch();
       } else if ((err as { name?: string })?.name === 'AbortError') {
         pushError('busy');
       } else {
@@ -551,7 +595,7 @@ export const AskSahayiniView: React.FC = () => {
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-200">
                               <ShieldCheck className="w-2.5 h-2.5 text-emerald-700" />
-                              <span>Verified Knowledge Base</span>
+                              <span>{extra.chatLocalBadge}</span>
                             </span>
                           )}
                           {msg.source === 'local_fallback' && msg.fallbackReason !== 'server_unreachable' && (
@@ -581,29 +625,26 @@ export const AskSahayiniView: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Listen and Read pill buttons on SAHAYINI responses matching Image 3 */}
-                      {!isUser && msg.source !== 'error' && (
-                        <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-2">
-                          <button
-                            onClick={() => handleSpeakText(msg.text, msg.id)}
-                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                              isSpeaking && activeSpeechMsgId === msg.id
-                                ? 'bg-emerald-600 text-white shadow-2xs animate-pulse'
-                                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
-                            }`}
-                          >
-                            {isSpeaking && activeSpeechMsgId === msg.id ? (
-                              <>
-                                <VolumeX className="w-3.5 h-3.5" />
-                                <span>{t.learn.stopAudio || 'Stop'}</span>
-                              </>
-                            ) : (
-                              <>
-                                <Volume2 className="w-3.5 h-3.5" />
-                                <span>{t.learn.listen}</span>
-                              </>
-                            )}
-                          </button>
+                      {/* Listen / Stop / Read pill buttons. Answers are text first: audio plays ONLY when Listen is tapped. */}
+                      {!isUser && msg.source !== 'error' && msg.id !== streamingId && (
+                        <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center gap-2">
+                          {isSpeaking && activeSpeechMsgId === msg.id ? (
+                            <button
+                              onClick={handleStopListening}
+                              className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer bg-red-600 text-white shadow-2xs"
+                            >
+                              <VolumeX className="w-3.5 h-3.5" />
+                              <span>{t.learn.stopAudio || 'Stop'}</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => void handleListen(msg.id, msg.text)}
+                              className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200"
+                            >
+                              <Volume2 className="w-3.5 h-3.5" />
+                              <span>{t.learn.listen}</span>
+                            </button>
+                          )}
 
                           <button
                             onClick={() => setReadingMessage(msg.text)}
@@ -625,7 +666,7 @@ export const AskSahayiniView: React.FC = () => {
               );
             })}
 
-            {isSending && (
+            {isSending && !streamingId && (
               <div className="flex items-center gap-2 text-xs text-slate-500 italic pl-10">
                 <span className="w-2 h-2 rounded-full bg-[#0A2E65] animate-ping" />
                 <span>{t.ask.preparingAnswer}</span>

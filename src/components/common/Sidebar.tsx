@@ -12,6 +12,8 @@ import {
   Settings,
   X,
   LogOut,
+  GraduationCap,
+  MapPin,
 } from 'lucide-react';
 import { ActiveTab } from '../../types';
 import { TricolorWave } from './TricolorWave';
@@ -30,10 +32,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { tab: 'dashboard', label: t.nav.home, icon: <Home className="w-5 h-5" /> },
     { tab: 'sos', label: t.nav.sos, icon: <AlertTriangle className="w-5 h-5 text-red-600" /> },
     { tab: 'schemes', label: t.nav.schemes, icon: <Landmark className="w-5 h-5 text-[#0A2E65]" /> },
+    { tab: 'exams', label: ({en:'Government Exams',ta:'அரசுத் தேர்வுகள்',hi:'सरकारी परीक्षाएँ',te:'ప్రభుత్వ పరీక్షలు',mr:'सरकारी परीक्षा',ml:'സർക്കാർ പരീക്ഷകൾ',gu:'સરકારી પરીક્ષાઓ',kn:'ಸರ್ಕಾರಿ ಪರೀಕ್ಷೆಗಳು'} as Record<string,string>)[language] || 'Government Exams', icon: <GraduationCap className="w-5 h-5 text-emerald-700" /> },
     { tab: 'chat', label: t.nav.ask, icon: <MessageCircle className="w-5 h-5 text-blue-600" /> },
     { tab: 'learn', label: t.nav.learn, icon: <BookOpen className="w-5 h-5 text-orange-600" /> },
     { tab: 'scam', label: t.nav.scam, icon: <ShieldCheck className="w-5 h-5 text-sky-600" /> },
     { tab: 'complaint', label: getComplaintStrings(language).sidebarLabel, icon: <FileText className="w-5 h-5 text-[#123A70]" /> },
+    { tab: 'location', label: ({en:'Share Your Location',ta:'உங்கள் இருப்பிடத்தைப் பகிரவும்',hi:'अपना स्थान साझा करें',te:'మీ స్థానాన్ని పంచుకోండి',mr:'तुमचे स्थान शेअर करा',ml:'നിങ്ങളുടെ സ്ഥാനം പങ്കിടുക',gu:'તમારું સ્થાન શેર કરો',kn:'ನಿಮ್ಮ ಸ್ಥಳವನ್ನು ಹಂಚಿಕೊಳ್ಳಿ'} as Record<string,string>)[language] || 'Share Your Location', icon: <MapPin className="w-5 h-5 text-indigo-600" /> },
     { tab: 'profile', label: t.nav.profile, icon: <User className="w-5 h-5 text-slate-600" /> },
     { tab: 'settings', label: t.nav.settings, icon: <Settings className="w-5 h-5 text-slate-600" /> },
   ];

@@ -4,6 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import dotenv from 'dotenv';
 import { buildModelChain } from './aiModels';
+import { createChatEngine, collectChat, pipeChatStream, ChatEngineError } from './chatEngine';
 import { analyzeScamLocally, maxRisk, localExplanation, SCAM_SAFETY_STEPS, ScamRisk } from './src/utils/scamHeuristics';
 
 dotenv.config();
@@ -32,6 +33,16 @@ const ai = apiKey
 // Ordered chain of verified, stable Flash models (see aiModels.ts). GEMINI_MODEL, if set, is tried first.
 const MODEL_CHAIN = buildModelChain(process.env.GEMINI_MODEL);
 const PRIMARY_MODEL = MODEL_CHAIN[0];
+
+// Streaming chat engine for Ask SAHAYINI (see chatEngine.ts). Scam analysis keeps using generateWithFallback below.
+const chatEngine = ai
+  ? createChatEngine({
+      ai: ai as never,
+      models: MODEL_CHAIN,
+      classify: (e) => classifyAiError(e),
+      onError: (e, model, attempt) => logAiError('chat', e, model, attempt),
+    })
+  : null;
 
 // Health check endpoint
 app.get('/api/health', (req: Request, res: Response) => {
@@ -86,7 +97,7 @@ const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
 };
 
 const MAX_CHAT_CHARS = 2000; // per message
-const MAX_HISTORY_TURNS = 8;
+const MAX_HISTORY_TURNS = 4; // fewer turns = less to send and read, so faster answers
 
 type AiErrorCode =
   | 'no_api_key'
@@ -273,8 +284,8 @@ LANGUAGE
 - Keep website addresses and phone numbers exactly as they are (for example 112, 1930, cybercrime.gov.in).
 
 FORMAT
-- The app shows plain text and reads answers aloud. Do NOT use markdown symbols such as **, #, backticks or tables. Use short paragraphs, numbered steps (1. 2. 3.) and simple "•" bullets.
-- Be clear, simple and step-by-step. Usually under 250 words; go longer only if the user needs it.
+- The app shows plain text (the user taps a Listen button if they want to hear it). Do NOT use markdown symbols such as **, #, backticks or tables. Use short paragraphs, numbered steps (1. 2. 3.) and simple "•" bullets.
+- Be clear, simple and step-by-step. Answer first, with no preamble. Keep it short for speed: usually 4 to 7 sentences or up to 5 short steps (about 120 words). Give more detail only if the user clearly asks for it.
 
 EMERGENCIES
 - If the user describes immediate danger, violence, stalking, threats or a medical emergency: the FIRST line must tell them to call 112 now. Then give a few short, practical safety steps (move to a safe public or lit place, get near trusted people, lock a door if inside, keep the phone charged, tell a trusted person where they are). Women can also call 1091 or 181; children can be helped through 1098.
@@ -298,7 +309,7 @@ PRIVACY AND SAFETY
 function buildChatContents(history: unknown, message: string) {
   const turns: { role: 'user' | 'model'; text: string }[] = [];
   const push = (role: 'user' | 'model', raw: unknown) => {
-    const text = typeof raw === 'string' ? raw.trim().slice(0, MAX_CHAT_CHARS) : '';
+    const text = typeof raw === 'string' ? raw.trim().slice(0, 700) : '';
     if (!text) return;
     const last = turns[turns.length - 1];
     if (last && last.role === role) last.text += `\n\n${text}`;
@@ -331,7 +342,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     if (message.length > MAX_CHAT_CHARS) {
       return fail('message_too_long', 400, `Please keep your question under ${MAX_CHAT_CHARS} characters.`);
     }
-    if (!ai) {
+    if (!ai || !chatEngine) {
       return fail('no_api_key', AI_ERROR_HTTP.no_api_key, AI_ERROR_DETAIL.no_api_key);
     }
 
@@ -341,16 +352,30 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       : 'en';
     const targetLangName = LANGUAGE_DISPLAY_NAMES[langKey];
 
+    const contents = buildChatContents(history, message.trim());
+    const systemInstruction = buildChatSystemInstruction(targetLangName);
+    const wantsStream = req.body?.stream === true;
+    const gen = chatEngine!.stream({ contents, systemInstruction });
+    let clientGone = false;
+    res.on('close', () => {
+      clientGone = true;
+    });
+
     try {
-      const { text, model, attempts } = await generateWithFallback({
-        where: 'chat',
-        contents: buildChatContents(history, message.trim()),
-        config: { systemInstruction: buildChatSystemInstruction(targetLangName) },
-      });
-      return res.json({ reply: text, source: 'gemini', model, attempts });
+      if (!wantsStream) {
+        // Plain JSON (same response shape as before).
+        const { text, model, attempts } = await collectChat(gen);
+        return res.json({ reply: text, source: 'gemini', model, attempts });
+      }
+      // Streaming: any failure before the first words comes back here and is answered as a normal JSON error.
+      const out = await pipeChatStream(res, gen, () => clientGone, (line) => console.log(line));
+      if (out.ok) return;
+      const code = out.code as AiErrorCode;
+      return fail(code, AI_ERROR_HTTP[code] ?? 502, AI_ERROR_DETAIL[code] ?? AI_ERROR_DETAIL.unknown);
     } catch (err) {
-      const code = (err as { aiCode?: AiErrorCode }).aiCode ?? classifyAiError(err);
-      return fail(code, AI_ERROR_HTTP[code], AI_ERROR_DETAIL[code]);
+      const code = ((err as ChatEngineError).code ?? classifyAiError(err)) as AiErrorCode;
+      if (res.headersSent) return res.end();
+      return fail(code, AI_ERROR_HTTP[code] ?? 502, AI_ERROR_DETAIL[code] ?? AI_ERROR_DETAIL.unknown);
     }
   } catch (error) {
     logAiError('chat', error);

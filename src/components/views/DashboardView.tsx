@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { OfflineSafetyKitModal } from '../common/OfflineSafetyKitModal';
-import { PWAInstallButton } from '../common/PWAInstallButton';
 import {
   Bell,
   Landmark,
@@ -19,16 +18,19 @@ import {
   HardDrive,
   Zap,
   FileText,
+  GraduationCap,
 } from 'lucide-react';
 import { TricolorWave } from '../common/TricolorWave';
 import { Logo } from '../common/Logo';
 import { LiveLocationShare } from '../common/LiveLocationShare';
 import { getComplaintStrings } from '../../i18n/complaintStrings';
+import { getSosStrings } from '../../i18n/sosStrings';
 
 export const DashboardView: React.FC = () => {
   const { setActiveTab, language, user, isOffline, t } = useApp();
 
   const cs = getComplaintStrings(language);
+  const sos = getSosStrings(language);
 
   const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'ready' | 'error'>('idle');
   const [gpsCoordinates, setGpsCoordinates] = useState<{ lat: number; lng: number } | null>(null);
@@ -130,7 +132,9 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
-      {/* 1. Emergency SOS Card matching Image 5 */}
+      {/* Six dashboard feature cards: exactly three rows on desktop */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Row 1, card 1: SOS */}
       <div className="relative overflow-hidden bg-gradient-to-br from-red-50 via-white to-orange-50 rounded-3xl p-5 border-2 border-red-200/80 shadow-xs hover:shadow-md transition-all">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -173,8 +177,7 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
-      {/* Grid of 4 Core Feature Cards matching Image 5 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
         {/* Government Schemes Card (Green) */}
         <div
           onClick={() => setActiveTab('schemes')}
@@ -294,6 +297,43 @@ export const DashboardView: React.FC = () => {
             <div className="w-16 h-2 bg-gradient-to-r from-sky-400 to-blue-600 rounded-full opacity-80" />
           </div>
         </div>
+        {/* Government Exams Card (Green) */}
+        <div
+          onClick={() => setActiveTab('exams')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setActiveTab('exams');
+            }
+          }}
+          className="group relative cursor-pointer overflow-hidden bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100/80 flex items-center justify-center text-emerald-700 shadow-2xs">
+                <GraduationCap className="w-6 h-6" />
+              </div>
+              <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
+            </div>
+
+            <h3 className="text-lg font-bold text-slate-900 tracking-tight">
+              {({en:'Government Exams',ta:'அரசுத் தேர்வுகள்',hi:'सरकारी परीक्षाएँ',te:'ప్రభుత్వ పరీక్షలు',mr:'सरकारी परीक्षा',ml:'സർക്കാർ പരീക്ഷകൾ',gu:'સરકારી પરીક્ષાઓ',kn:'ಸರ್ಕಾರಿ ಪರೀಕ್ಷೆಗಳು'} as Record<string, string>)[language] || 'Government Exams'}
+            </h3>
+            <p className="text-xs text-slate-600 mt-1 line-clamp-2">
+              {({en:'Explore UPSC, SSC, Banking, Railways, Defence and Tamil Nadu exams.',ta:'UPSC, SSC, வங்கி, ரயில்வே, பாதுகாப்பு மற்றும் தமிழ்நாடு தேர்வுகளைப் பாருங்கள்.',hi:'UPSC, SSC, बैंकिंग, रेलवे, रक्षा और तमिलनाडु परीक्षाएँ देखें।',te:'UPSC, SSC, బ్యాంకింగ్, రైల్వే, రక్షణ మరియు తమిళనాడు పరీక్షలను చూడండి.',mr:'UPSC, SSC, बँकिंग, रेल्वे, संरक्षण आणि तमिळनाडू परीक्षा पाहा.',ml:'UPSC, SSC, ബാങ്കിംഗ്, റെയിൽവേ, പ്രതിരോധം, തമിഴ്നാട് പരീക്ഷകൾ കാണുക.',gu:'UPSC, SSC, બેંકિંગ, રેલવે, સંરક્ષણ અને તમિલનાડુની પરીક્ષાઓ જુઓ.',kn:'UPSC, SSC, ಬ್ಯಾಂಕಿಂಗ್, ರೈಲ್ವೆ, ರಕ್ಷಣಾ ಮತ್ತು ತಮಿಳುನಾಡು ಪರೀಕ್ಷೆಗಳನ್ನು ಅನ್ವೇಷಿಸಿ.'} as Record<string, string>)[language] || 'Explore UPSC, SSC, Banking, Railways, Defence and Tamil Nadu exams.'}
+            </p>
+          </div>
+
+          <div className="mt-6 pt-3 border-t border-slate-50 flex items-center justify-between">
+            <span className="text-xs font-bold text-emerald-700 group-hover:underline">
+              {({en:'Explore Exams',ta:'தேர்வுகளைப் பார்க்க',hi:'परीक्षाएँ देखें',te:'పరీక్షలను చూడండి',mr:'परीक्षा पहा',ml:'പരീക്ഷകൾ കാണുക',gu:'પરીક્ષાઓ જુઓ',kn:'ಪರೀಕ್ಷೆಗಳನ್ನು ನೋಡಿ'} as Record<string, string>)[language] || 'Explore Exams'} →
+            </span>
+            <div className="w-16 h-2 bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full opacity-80" />
+          </div>
+        </div>
+
       </div>
 
       {/* Complaint & FIR Support Card (Navy) - sits between Scam Protection and Offline Safety */}
@@ -322,9 +362,6 @@ export const DashboardView: React.FC = () => {
         </button>
       </div>
 
-      {/* PWA Install Banner */}
-      <PWAInstallButton variant="banner" />
-
       {/* Offline Resilience Card */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-5 border border-indigo-900/60 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
@@ -333,13 +370,13 @@ export const DashboardView: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold">Offline Safety & Schemes Resiliency</h3>
+              <h3 className="text-sm font-bold">{({ en: 'Offline Safety & Schemes Resiliency', ta: 'ஆஃப்லைன் பாதுகாப்பு மற்றும் திட்டங்கள்', hi: 'ऑफ़लाइन सुरक्षा और योजनाएँ', te: 'ఆఫ్‌లైన్ భద్రత మరియు పథకాలు', mr: 'ऑफलाइन सुरक्षा आणि योजना', ml: 'ഓഫ്‌ലൈൻ സുരക്ഷയും പദ്ധതികളും', gu: 'ઑફલાઇન સુરક્ષા અને યોજનાઓ', kn: 'ಆಫ್‌ಲೈನ್ ಸುರಕ್ಷತೆ ಮತ್ತು ಯೋಜನೆಗಳು' } as Record<string, string>)[language] || 'Offline Safety & Schemes Resiliency'}</h3>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
-                100% Offline
+                {({ en: '100% Offline', ta: '100% ஆஃப்லைன்', hi: '100% ऑफ़लाइन', te: '100% ఆఫ్‌లైన్', mr: '100% ऑफलाइन', ml: '100% ഓഫ്‌ലൈൻ', gu: '100% ઑફલાઇન', kn: '100% ಆಫ್‌ಲೈನ್' } as Record<string, string>)[language] || '100% Offline'}
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
-              Critical emergency helplines, no-data SMS alerts, and all 15 government schemes are cached on this device for zero-connectivity zones.
+              {({ en: 'Critical emergency helplines, no-data SMS alerts, and government scheme information are saved on this device for low-connectivity areas.', ta: 'அவசர உதவி எண்கள், டேட்டா இல்லாத SMS எச்சரிக்கைகள் மற்றும் அரசு திட்டத் தகவல்கள் குறைந்த இணைய வசதிக்காக இந்தச் சாதனத்தில் சேமிக்கப்பட்டுள்ளன.', hi: 'कम नेटवर्क वाले क्षेत्रों के लिए आपातकालीन हेल्पलाइन, बिना डेटा वाले SMS अलर्ट और सरकारी योजनाओं की जानकारी इस डिवाइस में सहेजी गई है।', te: 'తక్కువ నెట్‌వర్క్ ప్రాంతాల కోసం అత్యవసర హెల్ప్‌లైన్‌లు, డేటా లేని SMS హెచ్చరికలు మరియు ప్రభుత్వ పథకాల సమాచారం ఈ పరికరంలో భద్రపరచబడ్డాయి.', mr: 'कमी नेटवर्क असलेल्या भागांसाठी आपत्कालीन हेल्पलाइन, डेटा-विरहित SMS सूचना आणि सरकारी योजनांची माहिती या डिव्हाइसवर जतन केली आहे.', ml: 'കുറഞ്ഞ നെറ്റ്‌വർക്ക് പ്രദേശങ്ങൾക്കായി അടിയന്തര ഹെൽപ്‌ലൈനുകളും ഡാറ്റയില്ലാത്ത SMS അറിയിപ്പുകളും സർക്കാർ പദ്ധതിവിവരങ്ങളും ഈ ഉപകരണത്തിൽ സൂക്ഷിച്ചിരിക്കുന്നു.', gu: 'ઓછા નેટવર્કવાળા વિસ્તારો માટે કટોકટી હેલ્પલાઇન, ડેટા વગરના SMS સૂચનો અને સરકારી યોજનાઓની માહિતી આ ઉપકરણમાં સાચવેલી છે.', kn: 'ಕಡಿಮೆ ನೆಟ್‌ವರ್ಕ್ ಪ್ರದೇಶಗಳಿಗಾಗಿ ತುರ್ತು ಸಹಾಯವಾಣಿ, ಡೇಟಾ ಇಲ್ಲದ SMS ಎಚ್ಚರಿಕೆಗಳು ಮತ್ತು ಸರ್ಕಾರಿ ಯೋಜನೆಗಳ ಮಾಹಿತಿಯನ್ನು ಈ ಸಾಧನದಲ್ಲಿ ಉಳಿಸಲಾಗಿದೆ.' } as Record<string, string>)[language] || 'Critical emergency helplines and government scheme information are saved on this device for low-connectivity areas.'}
             </p>
           </div>
         </div>
@@ -348,7 +385,7 @@ export const DashboardView: React.FC = () => {
           className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-xs transition whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5"
         >
           <HardDrive className="w-3.5 h-3.5" />
-          <span>Offline Kit</span>
+          <span>{sos.openOfflineKit}</span>
         </button>
       </div>
 
@@ -369,7 +406,8 @@ export const DashboardView: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={() => setActiveTab('location')} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0A2E65] text-white font-bold text-xs rounded-full">Open Location Page <ChevronRight className="w-4 h-4" /></button>
             <button
               onClick={handleShareLocation}
               disabled={locationStatus === 'locating'}

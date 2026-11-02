@@ -1,81 +1,52 @@
 import React, { useRef, useState } from 'react';
-import { Siren, Loader2, AlertTriangle, MapPin, Navigation, Phone, RefreshCw, Clock, Info, ExternalLink } from 'lucide-react';
+import { Siren, Loader2, MapPin, Navigation, Phone, RefreshCw, Clock, Info, ExternalLink } from 'lucide-react';
 import { Coords } from '../../utils/emergencyShare';
 import { useApp } from '../../context/AppContext';
 import { getLocationStrings, fill } from '../../i18n/locationStrings';
-import {
-  NearbyPoliceError,
-  NearbyPoliceResponse,
-  fetchNearbyPolice,
-  mapsSearchPoliceUrl,
-  telHref,
-} from '../../utils/nearbyPolice';
+import { NearbyPoliceResponse, fetchNearbyPolice, telHref } from '../../utils/nearbyPolice';
+import { policeMapsUrl } from '../../utils/policeMaps';
+import { usePoliceSearch } from '../../hooks/usePoliceSearch';
+import { PoliceSearchNote } from './PoliceSearchNote';
 
-type Phase = 'idle' | 'locating' | 'searching' | 'done' | 'error';
+type Phase = 'idle' | 'loading' | 'done';
 
 /**
- * Finds real police stations near the user's current GPS position via the SAHAYINI backend
- * (/api/nearby-police). Finding a station does NOT notify anyone.
+ * "Find Nearby Police Stations" on the Share Your Location page.
+ * The button opens Google Maps immediately (shared usePoliceSearch behaviour: latest GPS fix, or a general
+ * search if GPS is unavailable). The station list below is an optional extra loaded from the SAHAYINI
+ * backend (/api/nearby-police) when coordinates are known; if it fails, nothing is shown because Maps has
+ * already opened. Finding a station does NOT notify anyone.
  */
 export const NearbyPoliceCard: React.FC = () => {
   const { language } = useApp();
   const L = getLocationStrings(language);
+  const { search, busy: opening, note, fallbackUrl, P } = usePoliceSearch(language);
   const [phase, setPhase] = useState<Phase>('idle');
   const [coords, setCoords] = useState<Coords | null>(null);
   const [result, setResult] = useState<NearbyPoliceResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const runId = useRef(0);
+  const listRun = useRef(0);
 
-  const run = () => {
-    setError(null);
-    if (!('geolocation' in navigator)) {
-      setPhase('error');
-      setError(L.geoOther + ' ' + L.inDanger);
-      return;
+  const loadList = async (c: Coords) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    const id = ++listRun.current;
+    setPhase('loading');
+    try {
+      const r = await fetchNearbyPolice(c);
+      if (id !== listRun.current) return;
+      setCoords(c);
+      setResult(r);
+      setPhase('done');
+    } catch {
+      if (id === listRun.current) setPhase('idle');
     }
-    const id = ++runId.current;
-    setPhase('locating');
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        if (id !== runId.current) return;
-        const c: Coords = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
-        setCoords(c);
-        setPhase('searching');
-        try {
-          const r = await fetchNearbyPolice(c);
-          if (id !== runId.current) return;
-          setResult(r);
-          setPhase('done');
-        } catch (e) {
-          if (id !== runId.current) return;
-          setResult(null);
-          setPhase('error');
-          const err = e instanceof NearbyPoliceError ? e : null;
-          setError(
-            err?.kind === 'offline'
-              ? L.errOffline
-              : err?.kind === 'network'
-              ? L.errNetwork
-              : L.errSearch
-          );
-        }
-      },
-      (err) => {
-        if (id !== runId.current) return;
-        setPhase('error');
-        setError(
-          err.code === err.PERMISSION_DENIED
-            ? L.geoDenied
-            : err.code === err.TIMEOUT
-            ? L.geoTimeout
-            : L.geoUnavailable
-        );
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
   };
 
-  const busy = phase === 'locating' || phase === 'searching';
+  const run = async () => {
+    const r = await search();
+    if (r?.coords) void loadList(r.coords);
+  };
+
+  const busy = opening || phase === 'loading';
 
   return (
     <section aria-labelledby="nearby-police-title" className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs">
@@ -92,12 +63,12 @@ export const NearbyPoliceCard: React.FC = () => {
         <button
           type="button"
           onClick={run}
-          disabled={busy}
+          disabled={opening}
           className="px-4 py-2.5 min-h-11 bg-red-700 hover:bg-red-800 disabled:opacity-70 text-white text-xs font-bold rounded-full transition-colors flex items-center justify-center gap-2 cursor-pointer"
         >
           {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
           <span>
-            {phase === 'locating' ? L.locating : phase === 'searching' ? L.searching : L.pBtn}
+            {opening ? L.locating : phase === 'loading' ? L.searching : L.pBtn}
           </span>
         </button>
       </div>
@@ -111,12 +82,7 @@ export const NearbyPoliceCard: React.FC = () => {
           </span>
         </div>
 
-        {phase === 'error' && error && ![L.errSearch, L.errNetwork, L.errOffline].includes(error) && (
-          <div role="status" className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-950 flex items-start gap-2 leading-relaxed">
-            <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
-            <span>{error}</span>
-          </div>
-        )}
+        <PoliceSearchNote note={note} fallbackUrl={fallbackUrl} linkLabel={P.openLink} />
 
         {phase === 'done' && coords && result && (
           <>
@@ -139,7 +105,7 @@ export const NearbyPoliceCard: React.FC = () => {
                 <p className="font-bold">{L.noneFound}</p>
                 <p>{L.noneHint}</p>
                 <a
-                  href={mapsSearchPoliceUrl(coords)}
+                  href={policeMapsUrl(coords)}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 bg-[#0A2E65] text-white rounded-lg font-bold"
@@ -200,9 +166,6 @@ export const NearbyPoliceCard: React.FC = () => {
           </>
         )}
 
-        <a href={mapsSearchPoliceUrl(coords || undefined)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900">
-          <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> {L.searchMaps} in Google Maps
-        </a>
       </div>
     </section>
   );

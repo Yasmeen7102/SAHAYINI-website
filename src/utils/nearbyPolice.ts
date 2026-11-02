@@ -4,6 +4,7 @@
  * mapping service. Nothing here invents stations, phone numbers, addresses or distances.
  */
 import { Coords, distanceKm } from './emergencyShare';
+import { policeMapsUrl } from './policeMaps';
 
 export interface NearbyStation {
   id: string;
@@ -35,8 +36,8 @@ export class NearbyPoliceError extends Error {
   }
 }
 
-export const mapsSearchPoliceUrl = (c?: Coords | null) =>
-  c ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('police station')}%20near%20${c.lat},${c.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('police stations near me')}`;
+/** Google Maps police-station search (kept for existing imports). Same URL as the shared policeMaps helper. */
+export const mapsSearchPoliceUrl = (c?: Coords | null) => policeMapsUrl(c);
 
 export const stationMapUrl = (s: { lat: number; lng: number; name: string }) =>
   `https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`;

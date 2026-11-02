@@ -14,6 +14,8 @@ import { LearnView } from './components/views/LearnView';
 import { ScamProtectionView } from './components/views/ScamProtectionView';
 import { ComplaintSupportView } from './components/views/ComplaintSupportView';
 import { ProfileSettingsView } from './components/views/ProfileSettingsView';
+import { GovernmentExamsView } from './components/views/GovernmentExamsView';
+import { LocationSharingView } from './components/views/LocationSharingView';
 
 const MainLayout: React.FC = () => {
   const { activeTab, theme, textScale } = useApp();
@@ -86,6 +88,8 @@ const MainLayout: React.FC = () => {
           {activeTab === 'complaint' && <ComplaintSupportView />}
           {activeTab === 'profile' && <ProfileSettingsView />}
           {activeTab === 'settings' && <ProfileSettingsView />}
+          {activeTab === 'exams' && <GovernmentExamsView />}
+          {activeTab === 'location' && <LocationSharingView />}
         </main>
       </div>
 

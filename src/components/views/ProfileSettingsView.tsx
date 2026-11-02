@@ -25,9 +25,9 @@ import { Logo } from '../common/Logo';
 
 
 const PROFILE_UI: Record<string, Record<string,string>> = {
- en:{subtitle:'Manage your personal preferences, saved bookmarks, language, and accessibility display.',language:'Platform Language',languageDesc:'Choose from 8 Indian languages supported across SAHAYINI.',appearance:'Appearance & Accessibility Settings',theme:'Display Theme',light:'Light Mode',dark:'Dark Mode',contrast:'High Contrast',font:'Font Size (Accessibility)',normal:'Default (A)',large:'Large (A+)',xlarge:'Extra Large (A++)',saved:'Saved Data & Offline Cache',schemes:'Saved Government Schemes',bookmarked:'schemes bookmarked',view:'View →',lessons:'Completed Lessons',modules:'modules completed',learn:'Learn →',reset:'Reset Demo Data',cleared:'Data Cleared!',guest:'Guest User',signIn:'Sign In',create:'Create Account'},
- ta:{subtitle:'உங்கள் விருப்பங்கள், சேமித்தவை, மொழி மற்றும் அணுகல்தன்மை அமைப்புகளை நிர்வகிக்கவும்.',language:'தள மொழி',languageDesc:'SAHAYINI ஆதரிக்கும் 8 இந்திய மொழிகளில் தேர்வு செய்யவும்.',appearance:'தோற்றம் மற்றும் அணுகல்தன்மை அமைப்புகள்',theme:'காட்சி தீம்',light:'ஒளி பயன்முறை',dark:'இருள் பயன்முறை',contrast:'உயர் மாறுபாடு',font:'எழுத்துரு அளவு',normal:'இயல்பு (A)',large:'பெரியது (A+)',xlarge:'மிகப் பெரியது (A++)',saved:'சேமித்த தரவு மற்றும் ஆஃப்லைன் கேச்',schemes:'சேமித்த அரசு திட்டங்கள்',bookmarked:'திட்டங்கள் சேமிக்கப்பட்டன',view:'பார் →',lessons:'முடித்த பாடங்கள்',modules:'பாடங்கள் முடிக்கப்பட்டன',learn:'கற்க →',reset:'சோதனைத் தரவை மீட்டமை',cleared:'தரவு அழிக்கப்பட்டது!',guest:'விருந்தினர்',signIn:'உள்நுழை',create:'கணக்கை உருவாக்கு'},
- hi:{subtitle:'अपनी प्राथमिकताएँ, सहेजे गए आइटम, भाषा और सुगम्यता सेटिंग प्रबंधित करें।',language:'प्लेटफ़ॉर्म भाषा',languageDesc:'SAHAYINI में उपलब्ध 8 भारतीय भाषाओं में से चुनें।',appearance:'रूप और सुगम्यता सेटिंग',theme:'डिस्प्ले थीम',light:'लाइट मोड',dark:'डार्क मोड',contrast:'हाई कॉन्ट्रास्ट',font:'फ़ॉन्ट आकार',normal:'डिफ़ॉल्ट (A)',large:'बड़ा (A+)',xlarge:'बहुत बड़ा (A++)',saved:'सहेजा डेटा और ऑफ़लाइन कैश',schemes:'सहेजी सरकारी योजनाएँ',bookmarked:'योजनाएँ सहेजी गईं',view:'देखें →',lessons:'पूरे किए गए पाठ',modules:'मॉड्यूल पूरे हुए',learn:'सीखें →',reset:'डेमो डेटा रीसेट करें',cleared:'डेटा साफ़ हुआ!',guest:'अतिथि उपयोगकर्ता',signIn:'साइन इन',create:'खाता बनाएँ'},
+ en:{subtitle:'Manage your personal preferences, saved bookmarks, language, and accessibility display.',language:'Platform Language',languageDesc:'Choose from 8 Indian languages supported across SAHAYINI.',appearance:'Appearance & Accessibility Settings',theme:'Display Theme',light:'Light Mode',dark:'Dark Mode',contrast:'High Contrast',font:'Font Size (Accessibility)',normal:'Default (A)',large:'Large (A+)',xlarge:'Extra Large (A++)',saved:'Saved Data & Offline Cache',schemes:'Saved Government Schemes',bookmarked:'schemes bookmarked',view:'View →',lessons:'Completed Lessons',modules:'modules completed',learn:'Learn →',reset:'Reset Demo Data',cleared:'Data Cleared!',guest:'Guest User',signIn:'Sign In',create:'Create Account',guestDesc:'You are exploring SAHAYINI in guest mode. Sign in to sync your saved schemes and progress across sessions.',languageTitle:'Platform Language / மொழி தேர்வு',privacyTitle:'SAHAYINI Privacy & Data Integrity Pledge',privacyDesc:'Your emergency contacts, GPS location logs, and bookmarked schemes are never sold or transmitted to commercial third parties. All emergency calls and geolocation sharing are strictly user-initiated.',cacheDesc:'Local browser storage holds cached lessons and contacts for offline use.',confirmReset:'Are you sure you want to reset demo data and clear local cache?'},
+ ta:{subtitle:'உங்கள் விருப்பங்கள், சேமித்தவை, மொழி மற்றும் அணுகல்தன்மை அமைப்புகளை நிர்வகிக்கவும்.',language:'தள மொழி',languageDesc:'SAHAYINI ஆதரிக்கும் 8 இந்திய மொழிகளில் தேர்வு செய்யவும்.',appearance:'தோற்றம் மற்றும் அணுகல்தன்மை அமைப்புகள்',theme:'காட்சி தீம்',light:'ஒளி பயன்முறை',dark:'இருள் பயன்முறை',contrast:'உயர் மாறுபாடு',font:'எழுத்துரு அளவு',normal:'இயல்பு (A)',large:'பெரியது (A+)',xlarge:'மிகப் பெரியது (A++)',saved:'சேமித்த தரவு மற்றும் ஆஃப்லைன் கேச்',schemes:'சேமித்த அரசு திட்டங்கள்',bookmarked:'திட்டங்கள் சேமிக்கப்பட்டன',view:'பார் →',lessons:'முடித்த பாடங்கள்',modules:'பாடங்கள் முடிக்கப்பட்டன',learn:'கற்க →',reset:'சோதனைத் தரவை மீட்டமை',cleared:'தரவு அழிக்கப்பட்டது!',guest:'விருந்தினர்',signIn:'உள்நுழை',create:'கணக்கை உருவாக்கு',guestDesc:'நீங்கள் விருந்தினர் முறையில் SAHAYINI-ஐ பயன்படுத்துகிறீர்கள். சேமித்த திட்டங்கள் மற்றும் முன்னேற்றத்தை ஒத்திசைக்க உள்நுழையவும்.',languageTitle:'தள மொழி / மொழி தேர்வு',privacyTitle:'SAHAYINI தனியுரிமை மற்றும் தரவு பாதுகாப்பு உறுதி',privacyDesc:'உங்கள் அவசரத் தொடர்புகள், GPS இருப்பிடப் பதிவுகள் மற்றும் சேமித்த திட்டங்கள் வணிக மூன்றாம் தரப்பினருக்கு விற்கப்படவோ அனுப்பப்படவோ மாட்டாது. அவசர அழைப்புகளும் இருப்பிடப் பகிர்வும் உங்கள் செயலால் மட்டுமே தொடங்கும்.',cacheDesc:'ஆஃப்லைன் பயன்பாட்டிற்காக பாடங்களும் தொடர்புகளும் உலாவியில் சேமிக்கப்படுகின்றன.',confirmReset:'சோதனைத் தரவை மீட்டமைத்து உள்ளூர் கேச்சை அழிக்கவா?'},
+ hi:{subtitle:'अपनी प्राथमिकताएँ, सहेजे गए आइटम, भाषा और सुगम्यता सेटिंग प्रबंधित करें।',language:'प्लेटफ़ॉर्म भाषा',languageDesc:'SAHAYINI में उपलब्ध 8 भारतीय भाषाओं में से चुनें।',appearance:'रूप और सुगम्यता सेटिंग',theme:'डिस्प्ले थीम',light:'लाइट मोड',dark:'डार्क मोड',contrast:'हाई कॉन्ट्रास्ट',font:'फ़ॉन्ट आकार',normal:'डिफ़ॉल्ट (A)',large:'बड़ा (A+)',xlarge:'बहुत बड़ा (A++)',saved:'सहेजा डेटा और ऑफ़लाइन कैश',schemes:'सहेजी सरकारी योजनाएँ',bookmarked:'योजनाएँ सहेजी गईं',view:'देखें →',lessons:'पूरे किए गए पाठ',modules:'मॉड्यूल पूरे हुए',learn:'सीखें →',reset:'डेमो डेटा रीसेट करें',cleared:'डेटा साफ़ हुआ!',guest:'अतिथि उपयोगकर्ता',signIn:'साइन इन',create:'खाता बनाएँ',guestDesc:'आप SAHAYINI को अतिथि मोड में उपयोग कर रहे हैं। सहेजी गई योजनाओं और प्रगति को सिंक करने के लिए साइन इन करें।',languageTitle:'प्लेटफ़ॉर्म भाषा',privacyTitle:'SAHAYINI गोपनीयता और डेटा सुरक्षा प्रतिज्ञा',privacyDesc:'आपके आपातकालीन संपर्क, GPS स्थान लॉग और सहेजी गई योजनाएँ व्यावसायिक तीसरे पक्ष को बेची या भेजी नहीं जातीं। आपातकालीन कॉल और स्थान साझा करना केवल आपके द्वारा शुरू किया जाता है।',cacheDesc:'ऑफ़लाइन उपयोग के लिए पाठ और संपर्क ब्राउज़र में सहेजे जाते हैं।',confirmReset:'डेमो डेटा रीसेट करके स्थानीय कैश साफ़ करें?'},
  te:{subtitle:'మీ ప్రాధాన్యతలు, సేవ్ చేసినవి, భాష మరియు యాక్సెసిబిలిటీ సెట్టింగ్‌లను నిర్వహించండి.',language:'ప్లాట్‌ఫారమ్ భాష',languageDesc:'SAHAYINI మద్దతిచ్చే 8 భారతీయ భాషల్లో ఎంచుకోండి.',appearance:'రూపం మరియు యాక్సెసిబిలిటీ సెట్టింగ్‌లు',theme:'డిస్‌ప్లే థీమ్',light:'లైట్ మోడ్',dark:'డార్క్ మోడ్',contrast:'హై కాంట్రాస్ట్',font:'ఫాంట్ పరిమాణం',normal:'డిఫాల్ట్ (A)',large:'పెద్దది (A+)',xlarge:'చాలా పెద్దది (A++)',saved:'సేవ్ చేసిన డేటా మరియు ఆఫ్‌లైన్ క్యాష్',schemes:'సేవ్ చేసిన ప్రభుత్వ పథకాలు',bookmarked:'పథకాలు బుక్‌మార్క్ చేశాయి',view:'చూడండి →',lessons:'పూర్తయిన పాఠాలు',modules:'మాడ్యూల్స్ పూర్తయ్యాయి',learn:'నేర్చుకోండి →',reset:'డెమో డేటాను రీసెట్ చేయండి',cleared:'డేటా తొలగించబడింది!',guest:'అతిథి వినియోగదారు',signIn:'సైన్ ఇన్',create:'ఖాతా సృష్టించండి'},
  mr:{subtitle:'तुमची प्राधान्ये, जतन केलेले आयटम, भाषा आणि प्रवेशयोग्यता सेटिंग्ज व्यवस्थापित करा.',language:'प्लॅटफॉर्म भाषा',languageDesc:'SAHAYINI मधील 8 भारतीय भाषांपैकी निवडा.',appearance:'दिसणे आणि प्रवेशयोग्यता सेटिंग्ज',theme:'डिस्प्ले थीम',light:'लाइट मोड',dark:'डार्क मोड',contrast:'हाय कॉन्ट्रास्ट',font:'फॉन्ट आकार',normal:'डीफॉल्ट (A)',large:'मोठा (A+)',xlarge:'अतिमोठा (A++)',saved:'जतन केलेला डेटा आणि ऑफलाइन कॅशे',schemes:'जतन केलेल्या सरकारी योजना',bookmarked:'योजना जतन केल्या',view:'पहा →',lessons:'पूर्ण केलेले धडे',modules:'मॉड्यूल पूर्ण',learn:'शिका →',reset:'डेमो डेटा रीसेट करा',cleared:'डेटा साफ केला!',guest:'अतिथी वापरकर्ता',signIn:'साइन इन',create:'खाते तयार करा'},
  ml:{subtitle:'നിങ്ങളുടെ മുൻഗണനകൾ, സേവ് ചെയ്തവ, ഭാഷ, പ്രവേശനക്ഷമത ക്രമീകരണങ്ങൾ നിയന്ത്രിക്കുക.',language:'പ്ലാറ്റ്ഫോം ഭാഷ',languageDesc:'SAHAYINI പിന്തുണയ്ക്കുന്ന 8 ഇന്ത്യൻ ഭാഷകളിൽ നിന്ന് തിരഞ്ഞെടുക്കുക.',appearance:'രൂപവും പ്രവേശനക്ഷമത ക്രമീകരണങ്ങളും',theme:'ഡിസ്‌പ്ലേ തീം',light:'ലൈറ്റ് മോഡ്',dark:'ഡാർക്ക് മോഡ്',contrast:'ഹൈ കോൺട്രാസ്റ്റ്',font:'ഫോണ്ട് വലുപ്പം',normal:'ഡിഫോൾട്ട് (A)',large:'വലുത് (A+)',xlarge:'വളരെ വലുത് (A++)',saved:'സേവ് ചെയ്ത ഡാറ്റയും ഓഫ്‌ലൈൻ കാഷെയും',schemes:'സേവ് ചെയ്ത സർക്കാർ പദ്ധതികൾ',bookmarked:'പദ്ധതികൾ ബുക്ക്‌മാർക്ക് ചെയ്തു',view:'കാണുക →',lessons:'പൂർത്തിയാക്കിയ പാഠങ്ങൾ',modules:'മൊഡ്യൂളുകൾ പൂർത്തിയായി',learn:'പഠിക്കുക →',reset:'ഡെമോ ഡാറ്റ റീസെറ്റ് ചെയ്യുക',cleared:'ഡാറ്റ മായിച്ചു!',guest:'അതിഥി ഉപയോക്താവ്',signIn:'സൈൻ ഇൻ',create:'അക്കൗണ്ട് സൃഷ്ടിക്കുക'},
@@ -56,7 +56,7 @@ export const ProfileSettingsView: React.FC = () => {
   const ui = PROFILE_UI[language] || PROFILE_UI.en;
 
   const handleClearCache = () => {
-    if (confirm('Are you sure you want to reset demo data and clear local cache?')) {
+    if (confirm(ui.confirmReset)) {
       resetAllData();
       setCacheCleared(true);
       setTimeout(() => setCacheCleared(false), 3000);
@@ -72,7 +72,7 @@ export const ProfileSettingsView: React.FC = () => {
             {t.nav.profile} & {t.nav.settings}
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            Manage your personal preferences, saved bookmarks, language, and accessibility display.
+            {ui.subtitle}
           </p>
         </div>
         <Logo size="md" showText={false} className="shrink-0" />
@@ -120,20 +120,20 @@ export const ProfileSettingsView: React.FC = () => {
             </div>
             <h3 className="text-base font-bold text-slate-900">{ui.guest}</h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              You are exploring SAHAYINI in guest mode. Sign in to sync your saved schemes and progress across sessions.
+              {ui.guestDesc || PROFILE_UI.en.guestDesc}
             </p>
             <div className="pt-2 flex justify-center gap-2">
               <button
                 onClick={() => setActiveTab('login')}
                 className="px-5 py-2 bg-[#0A2E65] text-white font-bold text-xs rounded-full shadow-xs"
               >
-                Sign In
+                {ui.signIn}
               </button>
               <button
                 onClick={() => setActiveTab('signup')}
                 className="px-5 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-full hover:bg-slate-200"
               >
-                Create Account
+                {ui.create}
               </button>
             </div>
           </div>
@@ -145,11 +145,11 @@ export const ProfileSettingsView: React.FC = () => {
         <div className="flex items-center gap-2.5">
           <Globe className="w-5 h-5 text-[#0A2E65]" />
           <h2 className="text-base font-bold text-slate-900">
-            Platform Language / மொழி தேர்வு
+            {ui.languageTitle || PROFILE_UI.en.languageTitle}
           </h2>
         </div>
         <p className="text-xs text-slate-500">
-          Choose from 8 Indian languages supported natively across SAHAYINI.
+          {ui.languageDesc}
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
@@ -175,7 +175,7 @@ export const ProfileSettingsView: React.FC = () => {
         <div className="flex items-center gap-2.5">
           <Settings className="w-5 h-5 text-[#0A2E65]" />
           <h2 className="text-base font-bold text-slate-900">
-            Appearance & Accessibility Settings
+            {ui.appearance}
           </h2>
         </div>
 
@@ -233,7 +233,7 @@ export const ProfileSettingsView: React.FC = () => {
                   : 'bg-slate-50 border-slate-200 text-slate-600'
               }`}
             >
-              Default (A)
+              {ui.normal}
             </button>
 
             <button
@@ -244,7 +244,7 @@ export const ProfileSettingsView: React.FC = () => {
                   : 'bg-slate-50 border-slate-200 text-slate-600'
               }`}
             >
-              Large (A+)
+              {ui.large}
             </button>
 
             <button
@@ -255,7 +255,7 @@ export const ProfileSettingsView: React.FC = () => {
                   : 'bg-slate-50 border-slate-200 text-slate-600'
               }`}
             >
-              Extra Large (A++)
+              {ui.xlarge}
             </button>
           </div>
         </div>
@@ -264,33 +264,33 @@ export const ProfileSettingsView: React.FC = () => {
       {/* Saved Bookmarks & Data */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
         <h2 className="text-base font-bold text-slate-900">
-          Saved Data & Offline Cache
+          {ui.saved}
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
             <div>
               <span className="font-bold text-slate-800">{ui.schemes}</span>
-              <p className="text-slate-500 mt-0.5">{savedSchemeIds.length} schemes bookmarked</p>
+              <p className="text-slate-500 mt-0.5">{savedSchemeIds.length} {ui.bookmarked}</p>
             </div>
             <button
               onClick={() => setActiveTab('schemes')}
               className="text-[#0A2E65] font-bold hover:underline"
             >
-              View →
+              {ui.view}
             </button>
           </div>
 
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
             <div>
               <span className="font-bold text-slate-800">{ui.lessons}</span>
-              <p className="text-slate-500 mt-0.5">{completedLessonIds.length} modules completed</p>
+              <p className="text-slate-500 mt-0.5">{completedLessonIds.length} {ui.modules}</p>
             </div>
             <button
               onClick={() => setActiveTab('learn')}
               className="text-orange-600 font-bold hover:underline"
             >
-              Learn →
+              {ui.learn}
             </button>
           </div>
         </div>
@@ -298,7 +298,7 @@ export const ProfileSettingsView: React.FC = () => {
         {/* Clear Cache Button */}
         <div className="pt-2 flex items-center justify-between">
           <span className="text-xs text-slate-500">
-            Local browser storage holds cached lessons and contacts for offline use.
+            {ui.cacheDesc || PROFILE_UI.en.cacheDesc}
           </span>
           <button
             onClick={handleClearCache}
@@ -314,9 +314,9 @@ export const ProfileSettingsView: React.FC = () => {
       <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200/80 text-xs text-emerald-950 flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
         <div className="space-y-1">
-          <p className="font-bold">SAHAYINI Privacy & Data Integrity Pledge</p>
+          <p className="font-bold">{ui.privacyTitle || PROFILE_UI.en.privacyTitle}</p>
           <p className="text-emerald-800 leading-relaxed">
-            Your emergency contacts, GPS location logs, and bookmarked schemes are never sold or transmitted to commercial third parties. All emergency calls and geolocation sharing are strictly user-initiated.
+            {ui.privacyDesc || PROFILE_UI.en.privacyDesc}
           </p>
         </div>
       </div>

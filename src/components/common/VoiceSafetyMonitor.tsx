@@ -1,84 +1,387 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, ShieldAlert, Timer, XCircle, Play, Square, Share2, Download, MapPin, PhoneCall, CheckCircle2, AlertTriangle } from 'lucide-react';
+import {
+  AlertTriangle,
+  Download,
+  ExternalLink,
+  Info,
+  Mic,
+  MicOff,
+  PhoneCall,
+  Share2,
+  ShieldCheck,
+  Timer,
+  X,
+} from 'lucide-react';
+import { SosCard } from '../sos/SosCard';
+import { contactName } from '../sos/contactLabels';
+import { SosRecipients } from '../../hooks/useSosRecipients';
+import { getSosDashStrings } from '../../i18n/sosDashboardStrings';
+import { fill } from '../../i18n/locationStrings';
+import { getSosStrings } from '../../i18n/sosStrings';
+import { Coords, buildAlertText, mapsLink, smsHref } from '../../utils/emergencyShare';
+import {
+  CANCEL_COOLDOWN_MS,
+  COUNTDOWN_OPTIONS,
+  DEFAULT_COUNTDOWN,
+  LoudSoundGate,
+  PhraseGate,
+  classifyAlternatives,
+  normalizeCountdown,
+} from '../../utils/sosLogic';
+import { LanguageCode } from '../../types';
 
-type Contact = { id: string; name: string; phone: string };
-type Props = { contacts: Contact[]; language: string; coords: { lat: number; lng: number } | null };
+/**
+ * Automatic Voice Safety Monitor (web version).
+ *
+ * What it really does: while the SOS page is open and the microphone is allowed, it listens for
+ * emergency phrases (browser speech recognition, where available) and for a sustained loud sound.
+ * When one is detected it starts a cancellable countdown (10 s by default), records a short voice clip,
+ * looks up a fresh location and then PREPARES an alert (SMS links per selected contact, share sheet,
+ * audio download). It never sends anything by itself and never claims delivery.
+ *
+ * What a web page cannot do: listen in the background or with the screen off, or send SMS/WhatsApp
+ * silently. Those need the native Android app (see ANDROID_NATIVE_REQUIREMENTS.md).
+ */
 
+type Phase = 'idle' | 'countdown' | 'ready';
+type StatusCode = 'off' | 'active' | 'stopped' | 'unsupported' | 'denied' | 'needsTap' | 'countdown' | 'cancelled' | 'prepared';
+type Reason = { kind: 'phrase'; phrase: string } | { kind: 'loud' };
+type ErrorCode = 'denied' | 'unsupported' | 'noRecorder' | 'recordFail' | 'shareFail';
+type AudioNotice = 'shared' | 'downloaded' | null;
 
-const VOICE_UI: Record<string, Record<string, string>> = {
- en: {title:'Automatic Voice Safety Monitor',desc:'Detects supported emergency phrases and sustained loud sounds while this page is active. Loud sounds can cause false alarms.',active:'Monitoring active on this page',off:'Monitoring is off',count:'Countdown before alert',enable:'Enable monitoring',stop:'Stop monitoring',detected:'Possible emergency detected',cancel:'I am safe — cancel alert',recording:'Recording emergency voice message…',prepared:'Emergency alert prepared — action required',preparedDesc:'The recording is ready, but this website cannot silently send SMS or audio attachments. Choose a contact/message action below and confirm sending.',share:'Share voice + alert',download:'Download audio',sms:'Prepare SMS for',openLocation:'Open detected-alert location',noLocation:'No location was attached. Allow location access on the SOS page to include a map link.',note:'Initial permission is required, and this web version only runs while the page is active. Automatic background monitoring and silent audio/SMS delivery require a native app and a configured, permitted delivery service.'},
- ta: {title:'தானியங்கி குரல் பாதுகாப்புக் கண்காணிப்பு',desc:'இந்தப் பக்கம் செயலில் இருக்கும்போது அவசரச் சொற்களையும் நீடித்த அதிக ஒலியையும் கண்டறியும். அதிக ஒலி தவறான எச்சரிக்கையை ஏற்படுத்தலாம்.',active:'இந்தப் பக்கத்தில் கண்காணிப்பு செயலில் உள்ளது',off:'கண்காணிப்பு முடக்கப்பட்டுள்ளது',count:'எச்சரிக்கைக்கு முன் கவுண்ட்டவுன்',enable:'கண்காணிப்பை இயக்கு',stop:'கண்காணிப்பை நிறுத்து',detected:'சாத்தியமான அவசரம் கண்டறியப்பட்டது',cancel:'நான் பாதுகாப்பாக இருக்கிறேன் — ரத்து செய்',recording:'அவசரக் குரல் பதிவு செய்யப்படுகிறது…',prepared:'அவசர எச்சரிக்கை தயார் — நடவடிக்கை தேவை',preparedDesc:'பதிவு தயார். இந்த இணையதளம் SMS அல்லது ஆடியோவை அமைதியாக அனுப்ப முடியாது. கீழே தொடர்பைத் தேர்ந்தெடுத்து அனுப்புவதை உறுதிப்படுத்தவும்.',share:'குரல் + எச்சரிக்கையைப் பகிர்',download:'ஆடியோ பதிவிறக்கு',sms:'SMS தயார் செய்:',openLocation:'கண்டறிந்த இடத்தைத் திற',noLocation:'இடம் இணைக்கப்படவில்லை. SOS பக்கத்தில் இட அனுமதியை வழங்கவும்.',note:'முதலில் அனுமதி தேவை. இந்த இணைய பதிப்பு பக்கம் திறந்திருக்கும் போது மட்டுமே இயங்கும்.'},
- hi: {title:'स्वचालित वॉइस सुरक्षा मॉनिटर',desc:'पेज सक्रिय रहने पर आपातकालीन वाक्यांश और लगातार तेज़ आवाज़ पहचानता है। तेज़ आवाज़ से गलत अलर्ट हो सकता है।',active:'इस पेज पर निगरानी चालू है',off:'निगरानी बंद है',count:'अलर्ट से पहले उलटी गिनती',enable:'निगरानी चालू करें',stop:'निगरानी रोकें',detected:'संभावित आपात स्थिति मिली',cancel:'मैं सुरक्षित हूँ — अलर्ट रद्द करें',recording:'आपातकालीन आवाज़ रिकॉर्ड हो रही है…',prepared:'आपातकालीन अलर्ट तैयार — कार्रवाई आवश्यक',preparedDesc:'रिकॉर्डिंग तैयार है, लेकिन यह वेबसाइट SMS या ऑडियो चुपचाप नहीं भेज सकती। नीचे संपर्क चुनकर भेजने की पुष्टि करें।',share:'आवाज़ + अलर्ट साझा करें',download:'ऑडियो डाउनलोड करें',sms:'SMS तैयार करें:',openLocation:'पहचाना गया स्थान खोलें',noLocation:'स्थान नहीं जोड़ा गया। SOS पेज पर स्थान अनुमति दें।',note:'यह वेब संस्करण केवल पेज सक्रिय रहने पर चलता है।'},
- te: {title:'ఆటోమేటిక్ వాయిస్ సేఫ్టీ మానిటర్',desc:'ఈ పేజీ యాక్టివ్‌గా ఉన్నప్పుడు అత్యవసర పదాలు, ఎక్కువసేపు ఉండే పెద్ద శబ్దాలను గుర్తిస్తుంది. తప్పుడు హెచ్చరికలు రావచ్చు.',active:'ఈ పేజీలో పర్యవేక్షణ యాక్టివ్‌గా ఉంది',off:'పర్యవేక్షణ ఆఫ్‌లో ఉంది',count:'హెచ్చరికకు ముందు కౌంట్‌డౌన్',enable:'పర్యవేక్షణ ప్రారంభించండి',stop:'పర్యవేక్షణ ఆపండి',detected:'అత్యవసర పరిస్థితి ఉండవచ్చని గుర్తించాం',cancel:'నేను సురక్షితంగా ఉన్నాను — రద్దు చేయండి',recording:'అత్యవసర వాయిస్ రికార్డ్ అవుతోంది…',prepared:'అత్యవసర హెచ్చరిక సిద్ధం — చర్య అవసరం',preparedDesc:'రికార్డింగ్ సిద్ధంగా ఉంది; ఈ వెబ్‌సైట్ SMS లేదా ఆడియోను నిశ్శబ్దంగా పంపలేను. కాంటాక్ట్ ఎంచుకుని పంపడాన్ని నిర్ధారించండి.',share:'వాయిస్ + హెచ్చరిక పంచుకోండి',download:'ఆడియో డౌన్‌లోడ్',sms:'SMS సిద్ధం చేయండి:',openLocation:'గుర్తించిన స్థానాన్ని తెరవండి',noLocation:'స్థానం జోడించలేదు. SOS పేజీలో లొకేషన్ అనుమతి ఇవ్వండి.',note:'ఈ వెబ్ వెర్షన్ పేజీ యాక్టివ్‌గా ఉన్నప్పుడే పనిచేస్తుంది.'},
- mr: {title:'स्वयंचलित व्हॉइस सुरक्षा मॉनिटर',desc:'हे पृष्ठ सक्रिय असताना आपत्कालीन वाक्ये आणि सतत मोठे आवाज ओळखते. चुकीचा अलर्ट होऊ शकतो.',active:'या पृष्ठावर निरीक्षण सुरू आहे',off:'निरीक्षण बंद आहे',count:'अलर्टपूर्वी काउंटडाउन',enable:'निरीक्षण सुरू करा',stop:'निरीक्षण थांबवा',detected:'संभाव्य आपत्कालीन स्थिती आढळली',cancel:'मी सुरक्षित आहे — अलर्ट रद्द करा',recording:'आपत्कालीन आवाज रेकॉर्ड होत आहे…',prepared:'आपत्कालीन अलर्ट तयार — कृती आवश्यक',preparedDesc:'रेकॉर्डिंग तयार आहे; ही वेबसाइट SMS किंवा ऑडिओ शांतपणे पाठवू शकत नाही. संपर्क निवडून पाठवण्याची पुष्टी करा.',share:'आवाज + अलर्ट शेअर करा',download:'ऑडिओ डाउनलोड करा',sms:'SMS तयार करा:',openLocation:'आढळलेले ठिकाण उघडा',noLocation:'ठिकाण जोडलेले नाही. SOS पृष्ठावर स्थान परवानगी द्या.',note:'ही वेब आवृत्ती पृष्ठ सक्रिय असतानाच चालते.'},
- ml: {title:'ഓട്ടോമാറ്റിക് വോയ്സ് സുരക്ഷാ നിരീക്ഷണം',desc:'പേജ് സജീവമായിരിക്കുമ്പോൾ അടിയന്തര വാക്കുകളും തുടർച്ചയായ ഉച്ചത്തിലുള്ള ശബ്ദവും കണ്ടെത്തുന്നു. തെറ്റായ അലർട്ട് ഉണ്ടാകാം.',active:'ഈ പേജിൽ നിരീക്ഷണം സജീവമാണ്',off:'നിരീക്ഷണം ഓഫ് ആണ്',count:'അലർട്ടിന് മുമ്പുള്ള കൗണ്ട്ഡൗൺ',enable:'നിരീക്ഷണം ആരംഭിക്കുക',stop:'നിരീക്ഷണം നിർത്തുക',detected:'സാധ്യമായ അടിയന്തരാവസ്ഥ കണ്ടെത്തി',cancel:'ഞാൻ സുരക്ഷിതനാണ് — അലർട്ട് റദ്ദാക്കുക',recording:'അടിയന്തര ശബ്ദം റെക്കോർഡ് ചെയ്യുന്നു…',prepared:'അടിയന്തര അലർട്ട് തയ്യാറായി — നടപടി ആവശ്യമാണ്',preparedDesc:'റെക്കോർഡിംഗ് തയ്യാറാണ്, എന്നാൽ ഈ വെബ്സൈറ്റിന് SMS അല്ലെങ്കിൽ ഓഡിയോ നിശ്ശബ്ദമായി അയയ്ക്കാനാകില്ല. കോൺടാക്റ്റ് തിരഞ്ഞെടുത്ത് അയയ്ക്കൽ സ്ഥിരീകരിക്കുക.',share:'ശബ്ദവും അലർട്ടും പങ്കിടുക',download:'ഓഡിയോ ഡൗൺലോഡ്',sms:'SMS തയ്യാറാക്കുക:',openLocation:'കണ്ടെത്തിയ സ്ഥലം തുറക്കുക',noLocation:'സ്ഥലം ചേർത്തിട്ടില്ല. SOS പേജിൽ ലൊക്കേഷൻ അനുമതി നൽകുക.',note:'ഈ വെബ് പതിപ്പ് പേജ് സജീവമായിരിക്കുമ്പോൾ മാത്രം പ്രവർത്തിക്കും.'},
- gu: {title:'સ્વચાલિત વૉઇસ સુરક્ષા મોનિટર',desc:'પેજ સક્રિય હોય ત્યારે ઇમરજન્સી શબ્દો અને સતત મોટા અવાજને ઓળખે છે. ખોટો એલર્ટ થઈ શકે છે.',active:'આ પેજ પર મોનિટરિંગ સક્રિય છે',off:'મોનિટરિંગ બંધ છે',count:'એલર્ટ પહેલાં કાઉન્ટડાઉન',enable:'મોનિટરિંગ ચાલુ કરો',stop:'મોનિટરિંગ બંધ કરો',detected:'સંભવિત ઇમરજન્સી મળી',cancel:'હું સુરક્ષિત છું — એલર્ટ રદ કરો',recording:'ઇમરજન્સી અવાજ રેકોર્ડ થઈ રહ્યો છે…',prepared:'ઇમરજન્સી એલર્ટ તૈયાર — પગલું જરૂરી',preparedDesc:'રેકોર્ડિંગ તૈયાર છે, પરંતુ આ વેબસાઇટ SMS અથવા ઑડિયો ચૂપચાપ મોકલી શકતી નથી. સંપર્ક પસંદ કરીને મોકલવાની પુષ્ટિ કરો.',share:'અવાજ + એલર્ટ શેર કરો',download:'ઑડિયો ડાઉનલોડ કરો',sms:'SMS તૈયાર કરો:',openLocation:'ઓળખાયેલ સ્થાન ખોલો',noLocation:'સ્થાન જોડાયું નથી. SOS પેજમાં સ્થાનની પરવાનગી આપો.',note:'આ વેબ આવૃત્તિ પેજ સક્રિય હોય ત્યારે જ ચાલે છે.'},
- kn: {title:'ಸ್ವಯಂಚಾಲಿತ ಧ್ವನಿ ಸುರಕ್ಷತಾ ಮೇಲ್ವಿಚಾರಣೆ',desc:'ಪುಟ ಸಕ್ರಿಯವಾಗಿರುವಾಗ ತುರ್ತು ಪದಗಳು ಮತ್ತು ನಿರಂತರ ಜೋರಾದ ಶಬ್ದವನ್ನು ಪತ್ತೆಹಚ್ಚುತ್ತದೆ. ತಪ್ಪು ಎಚ್ಚರಿಕೆ ಸಂಭವಿಸಬಹುದು.',active:'ಈ ಪುಟದಲ್ಲಿ ಮೇಲ್ವಿಚಾರಣೆ ಸಕ್ರಿಯವಾಗಿದೆ',off:'ಮೇಲ್ವಿಚಾರಣೆ ಆಫ್ ಆಗಿದೆ',count:'ಎಚ್ಚರಿಕೆಗೆ ಮುನ್ನ ಕೌಂಟ್‌ಡೌನ್',enable:'ಮೇಲ್ವಿಚಾರಣೆ ಪ್ರಾರಂಭಿಸಿ',stop:'ಮೇಲ್ವಿಚಾರಣೆ ನಿಲ್ಲಿಸಿ',detected:'ಸಂಭಾವ್ಯ ತುರ್ತು ಪರಿಸ್ಥಿತಿ ಪತ್ತೆಯಾಗಿದೆ',cancel:'ನಾನು ಸುರಕ್ಷಿತವಾಗಿದ್ದೇನೆ — ರದ್ದುಮಾಡಿ',recording:'ತುರ್ತು ಧ್ವನಿ ದಾಖಲಿಸಲಾಗುತ್ತಿದೆ…',prepared:'ತುರ್ತು ಎಚ್ಚರಿಕೆ ಸಿದ್ಧ — ಕ್ರಮ ಅಗತ್ಯ',preparedDesc:'ದಾಖಲೆ ಸಿದ್ಧವಾಗಿದೆ, ಆದರೆ ಈ ವೆಬ್‌ಸೈಟ್ SMS ಅಥವಾ ಆಡಿಯೊವನ್ನು ಮೌನವಾಗಿ ಕಳುಹಿಸಲಾರದು. ಸಂಪರ್ಕವನ್ನು ಆಯ್ಕೆ ಮಾಡಿ ಕಳುಹಿಸುವುದನ್ನು ದೃಢೀಕರಿಸಿ.',share:'ಧ್ವನಿ + ಎಚ್ಚರಿಕೆಯನ್ನು ಹಂಚಿಕೊಳ್ಳಿ',download:'ಆಡಿಯೊ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ',sms:'SMS ಸಿದ್ಧಪಡಿಸಿ:',openLocation:'ಪತ್ತೆಯಾದ ಸ್ಥಳ ತೆರೆಯಿರಿ',noLocation:'ಸ್ಥಳ ಸೇರಿಸಲಾಗಿಲ್ಲ. SOS ಪುಟದಲ್ಲಿ ಸ್ಥಳ ಅನುಮತಿ ನೀಡಿ.',note:'ಈ ವೆಬ್ ಆವೃತ್ತಿ ಪುಟ ಸಕ್ರಿಯವಾಗಿರುವಾಗ ಮಾತ್ರ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತದೆ.'}
+const PREFS_KEY = 'sahayini_voice_monitor';
+const RECOGNITION_LANG: Record<LanguageCode, string> = {
+  en: 'en-IN', ta: 'ta-IN', hi: 'hi-IN', te: 'te-IN', mr: 'mr-IN', ml: 'ml-IN', gu: 'gu-IN', kn: 'kn-IN',
+};
+const AFTER_DISMISS_COOLDOWN_MS = 30_000;
+
+interface Prefs {
+  enabled: boolean;
+  seconds: number;
+}
+
+const loadPrefs = (): Prefs => {
+  try {
+    const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+    return { enabled: p.enabled === true, seconds: normalizeCountdown(p.seconds) };
+  } catch {
+    return { enabled: false, seconds: DEFAULT_COUNTDOWN };
+  }
 };
 
-const PHRASES: Record<string, string[]> = {
-  en: ['help me', 'help', 'save me', 'emergency', 'call the police', 'stop it'],
-  ta: ['உதவி', 'காப்பாற்றுங்கள்', 'காவல்துறையை அழைக்கவும்', 'அவசரம்'],
-  hi: ['बचाओ', 'मदद करो', 'मदद', 'पुलिस बुलाओ', 'आपातकाल'],
-  te: ['సహాయం', 'నన్ను కాపాడండి', 'పోలీసులను పిలవండి', 'అత్యవసరం'],
-  mr: ['वाचवा', 'मदत करा', 'पोलिसांना बोलवा', 'आपत्कालीन'],
-  ml: ['സഹായിക്കൂ', 'രക്ഷിക്കൂ', 'പോലീസിനെ വിളിക്കൂ', 'അടിയന്തരാവസ്ഥ'],
-  gu: ['મદદ કરો', 'બચાવો', 'પોલીસને બોલાવો', 'કટોકટી'],
-  kn: ['ಸಹಾಯ ಮಾಡಿ', 'ಉಳಿಸಿ', 'ಪೊಲೀಸರನ್ನು ಕರೆಸಿ', 'ತುರ್ತು'],
+const savePrefs = (p: Prefs) => {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+  } catch {
+    /* storage blocked: settings last for this session only */
+  }
 };
 
-export const VoiceSafetyMonitor: React.FC<Props> = ({ contacts, language, coords }) => {
+interface Props {
+  recipients: SosRecipients;
+  language: LanguageCode;
+  /** Latest location known to the SOS page (from live sharing), used if a fresh fix is unavailable. */
+  coords: Coords | null;
+}
+
+export const VoiceSafetyMonitor: React.FC<Props> = ({ recipients, language, coords }) => {
+  const D = getSosDashStrings(language);
+  const ss = getSosStrings(language);
+
+  const supported =
+    typeof navigator !== 'undefined' &&
+    !!navigator.mediaDevices?.getUserMedia &&
+    (typeof window === 'undefined' || window.isSecureContext !== false);
+
+  const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const [monitoring, setMonitoring] = useState(false);
-  const [status, setStatus] = useState('Monitoring is off. Enable it to grant microphone permission and start this page session.');
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const [seconds, setSeconds] = useState(10);
+  const [permDenied, setPermDenied] = useState(false);
+  const [statusCode, setStatusCode] = useState<StatusCode>('off');
+  const [speechNote, setSpeechNote] = useState<'none' | 'unavailable' | 'interrupted' | 'langUnsupported'>('none');
+  const [warmup, setWarmup] = useState(false);
+  const [detectors, setDetectors] = useState({ phrase: false, loud: false });
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [countdown, setCountdown] = useState(0);
+  const [reason, setReason] = useState<Reason | null>(null);
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [alertReady, setAlertReady] = useState(false);
-  const [reason, setReason] = useState('');
-  const [error, setError] = useState('');
+  const [alertCoords, setAlertCoords] = useState<Coords | null>(null);
+  const [errorCode, setErrorCode] = useState<ErrorCode | null>(null);
+  const [audioNotice, setAudioNotice] = useState<AudioNotice>(null);
+  const [showStatus, setShowStatus] = useState(false);
+
+  // Refs hold values that timers and recognition callbacks must read fresh.
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
+  const languageRef = useRef(language);
+  const coordsRef = useRef<Coords | null>(coords);
+  coordsRef.current = coords;
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
-  const timerRef = useRef<number | null>(null);
-  const countdownRef = useRef<number | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const discardRef = useRef(false);
   const recognitionRef = useRef<any>(null);
-  const monitoringRef = useRef(false);
-  const triggeredRef = useRef(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const loudTimerRef = useRef<number | null>(null);
+  const countdownTimerRef = useRef<number | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  const monitoringRef = useRef(false);
+  const startingRef = useRef(false);
+  const triggeredRef = useRef(false);
+  const suppressUntilRef = useRef(0);
+  const alertCoordsRef = useRef<Coords | null>(null);
+  const phraseGate = useRef(new PhraseGate());
+  const loudGate = useRef(new LoudSoundGate());
 
-  const ui = VOICE_UI[language] || VOICE_UI.en;
-  const mapLink = coords ? `https://maps.google.com/?q=${coords.lat},${coords.lng}` : '';
-  const alertText = `SAHAYINI EMERGENCY ALERT: Possible danger detected. Please contact me immediately.${mapLink ? ` My location: ${mapLink}` : ' My GPS location is unavailable.'}`;
+  const speechSupported =
+    typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  const unavailable = !supported || permDenied;
+  // "Monitoring Active" only when at least one detector is genuinely running.
+  const running = monitoring && (detectors.phrase || detectors.loud);
+
+  const updatePrefs = (patch: Partial<Prefs>) => {
+    const next = { ...prefsRef.current, ...patch };
+    prefsRef.current = next;
+    setPrefs(next);
+    savePrefs(next);
+  };
+
+  /* ---------- detectors ---------- */
+
+  const stopRecognition = () => {
+    const rec = recognitionRef.current;
+    recognitionRef.current = null; // clear first so onend does not restart it
+    try {
+      rec?.stop();
+    } catch {
+      /* already stopped */
+    }
+    setDetectors((d) => ({ ...d, phrase: false }));
+  };
 
   const stopAudioDetection = () => {
-    if (timerRef.current !== null) window.clearInterval(timerRef.current);
-    timerRef.current = null;
-    if (audioContextRef.current) { void audioContextRef.current.close().catch(() => {}); audioContextRef.current = null; }
+    if (loudTimerRef.current !== null) window.clearInterval(loudTimerRef.current);
+    loudTimerRef.current = null;
+    if (audioCtxRef.current) {
+      void audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+    setDetectors((d) => ({ ...d, loud: false }));
+  };
+
+  const clearCountdown = () => {
+    if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
+    countdownTimerRef.current = null;
+  };
+
+  const startRecognition = () => {
+    const w = window as any;
+    const Recognition = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!Recognition) {
+      setDetectors((d) => ({ ...d, phrase: false }));
+      setSpeechNote('unavailable');
+      return;
+    }
+    const rec = new Recognition();
+    recognitionRef.current = rec;
+    // The recognition locale follows the selected app language (en-IN, ta-IN, hi-IN, te-IN, mr-IN, ml-IN, gu-IN, kn-IN).
+    rec.lang = RECOGNITION_LANG[languageRef.current] || 'en-IN';
+    rec.continuous = true;
+    rec.interimResults = false; // finished utterances only: fewer false triggers than interim text
+    rec.maxAlternatives = 3; // engines often rank the right word second for Indian languages
+    rec.onstart = () => {
+      // "Phrase detection on" is only reported once the browser really started listening.
+      if (recognitionRef.current !== rec) return;
+      setSpeechNote('none');
+      setDetectors((d) => ({ ...d, phrase: true }));
+    };
+    rec.onresult = (event: any) => {
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        if (!result.isFinal) continue;
+        const alternatives: string[] = [];
+        for (let k = 0; k < result.length; k += 1) alternatives.push(result[k]?.transcript || '');
+        const m = classifyAlternatives(alternatives, languageRef.current);
+        if (m.strong) {
+          triggerAlert({ kind: 'phrase', phrase: m.strong });
+          return;
+        }
+        if (m.weakCount > 0 && phraseGate.current.register(m.weakCount, Date.now())) {
+          triggerAlert({ kind: 'phrase', phrase: m.weak || '' });
+          return;
+        }
+      }
+    };
+    rec.onerror = (e: any) => {
+      const code = e?.error;
+      if (code === 'language-not-supported') {
+        // This browser has no speech model for the selected language: say so, do not keep retrying.
+        recognitionRef.current = null;
+        setDetectors((d) => ({ ...d, phrase: false }));
+        setSpeechNote('langUnsupported');
+      } else if (code === 'not-allowed' || code === 'service-not-allowed') {
+        recognitionRef.current = null;
+        setDetectors((d) => ({ ...d, phrase: false }));
+        setSpeechNote('unavailable');
+      } else if (code === 'audio-capture' || code === 'network') {
+        setDetectors((d) => ({ ...d, phrase: false }));
+        setSpeechNote('interrupted');
+      } else if (code !== 'no-speech' && code !== 'aborted') {
+        setSpeechNote('interrupted');
+      }
+    };
+    rec.onend = () => {
+      if (recognitionRef.current !== rec) return;
+      setDetectors((d) => ({ ...d, phrase: false }));
+      if (!monitoringRef.current) return;
+      // Browsers end continuous recognition after silence; restart it shortly (not in a tight loop).
+      window.setTimeout(() => {
+        if (!monitoringRef.current || recognitionRef.current !== rec) return;
+        try {
+          rec.start();
+        } catch {
+          setSpeechNote('interrupted');
+        }
+      }, 300);
+    };
+    try {
+      rec.start();
+    } catch {
+      recognitionRef.current = null;
+      setDetectors((d) => ({ ...d, phrase: false }));
+      setSpeechNote('unavailable');
+    }
+  };
+
+  const startLoudDetection = (stream: MediaStream) => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx: AudioContext = new AudioCtx();
+      audioCtxRef.current = ctx;
+      void ctx.resume?.().catch(() => {});
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.fftSize);
+      loudGate.current.reset();
+      loudTimerRef.current = window.setInterval(() => {
+        if (!monitoringRef.current || triggeredRef.current) return;
+        analyser.getByteTimeDomainData(data);
+        let sum = 0;
+        for (const v of data) {
+          const x = (v - 128) / 128;
+          sum += x * x;
+        }
+        const rms = Math.sqrt(sum / data.length);
+        if (loudGate.current.update(rms, Date.now())) triggerAlert({ kind: 'loud' });
+      }, 250);
+      // An AudioContext created without a user tap can stay suspended; report that honestly.
+      window.setTimeout(() => setDetectors((d) => ({ ...d, loud: ctx.state === 'running' && audioCtxRef.current === ctx })), 700);
+    } catch {
+      /* phrase detection can still run */
+    }
+  };
+
+  /* ---------- start / stop ---------- */
+
+  const teardown = () => {
+    monitoringRef.current = false;
+    setMonitoring(false);
+    stopRecognition();
+    stopAudioDetection();
+    streamRef.current?.getTracks().forEach((track) => {
+      track.onended = null;
+      track.stop();
+    });
+    streamRef.current = null;
+    setDetectors({ phrase: false, loud: false });
+    setSpeechNote('none');
+    setWarmup(false);
+  };
+
+  const startMonitoring = async (auto = false) => {
+    setErrorCode(null);
+    if (!supported) {
+      setStatusCode('unsupported');
+      if (!auto) setErrorCode('unsupported');
+      return;
+    }
+    if (monitoringRef.current || startingRef.current) return;
+    startingRef.current = true;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      monitoringRef.current = true;
+      triggeredRef.current = false;
+      phraseGate.current.reset();
+      loudGate.current.reset();
+      stream.getAudioTracks().forEach((track) => {
+        track.onended = () => {
+          // Microphone taken away (device unplugged, OS revoked it): say so instead of pretending to listen.
+          if (!monitoringRef.current) return;
+          teardown();
+          setStatusCode('needsTap');
+        };
+      });
+      setMonitoring(true);
+      setWarmup(true);
+      window.setTimeout(() => setWarmup(false), 2500);
+      setPermDenied(false);
+      setStatusCode('active');
+      updatePrefs({ enabled: true });
+      startRecognition();
+      startLoudDetection(stream);
+    } catch (e) {
+      monitoringRef.current = false;
+      setMonitoring(false);
+      const name = (e as { name?: string })?.name;
+      const denied = name === 'NotAllowedError' || name === 'SecurityError';
+      if (denied) setPermDenied(true);
+      setStatusCode(denied ? 'denied' : 'unsupported');
+      if (!auto) setErrorCode(denied ? 'denied' : 'unsupported');
+    } finally {
+      startingRef.current = false;
+    }
   };
 
   const stopMonitoring = () => {
-    monitoringRef.current = false;
-    setMonitoring(false);
-    try { recognitionRef.current?.stop(); } catch { /* already stopped */ }
-    recognitionRef.current = null;
-    stopAudioDetection();
-    if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-    streamRef.current = null;
-    setRecording(false);
-    setStatus('Monitoring stopped. This website can only monitor while the page remains active.');
+    clearCountdown();
+    triggeredRef.current = false;
+    setPhase('idle');
+    teardown();
+    setStatusCode('stopped');
+    updatePrefs({ enabled: false });
   };
 
-  const beginRecording = (stream: MediaStream) => {
+  /* ---------- alert flow ---------- */
+
+  const revokeAudio = () => {
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    audioUrlRef.current = null;
+    setAudioUrl(null);
+  };
+
+  const startRecording = () => {
+    const stream = streamRef.current;
+    if (!stream) return;
+    if (typeof MediaRecorder === 'undefined') {
+      setErrorCode('noRecorder');
+      return;
+    }
     try {
-      if (typeof MediaRecorder === 'undefined') { setError('This browser cannot record audio.'); return; }
       chunksRef.current = [];
+      discardRef.current = false;
       const preferred = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
       const recorder = new MediaRecorder(stream, preferred ? { mimeType: preferred } : undefined);
       recorderRef.current = recorder;
-      recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
       recorder.onstop = () => {
+        setRecording(false);
+        if (discardRef.current) return;
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
         if (blob.size) {
           if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
@@ -86,144 +389,465 @@ export const VoiceSafetyMonitor: React.FC<Props> = ({ contacts, language, coords
           audioUrlRef.current = url;
           setAudioUrl(url);
         }
-        setRecording(false);
       };
       recorder.start();
       setRecording(true);
-    } catch { setError('Could not start voice recording on this device.'); }
+    } catch {
+      setErrorCode('recordFail');
+    }
   };
 
-  const triggerAlert = (why: string) => {
+  const stopRecorder = (discard: boolean) => {
+    discardRef.current = discard;
+    if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+  };
+
+  const finishCountdown = () => {
+    stopRecorder(false);
+    setAlertCoords(alertCoordsRef.current);
+    setCountdown(0);
+    setPhase('ready');
+    setStatusCode('prepared');
+  };
+
+  const triggerAlert = (r: Reason) => {
     if (triggeredRef.current || !monitoringRef.current) return;
+    if (Date.now() < suppressUntilRef.current) return;
     triggeredRef.current = true;
-    setReason(why);
-    setAlertReady(false);
-    setStatus('Possible danger detected. Recording a short voice message during the 10-second cancellation countdown.');
-    const stream = streamRef.current;
-    if (stream && !recording) beginRecording(stream);
-    setCountdown(seconds);
-    let remaining = seconds;
-    countdownRef.current = window.setInterval(() => {
+    setReason(r);
+    setErrorCode(null);
+    setAudioNotice(null);
+    revokeAudio();
+    setPhase('countdown');
+    setStatusCode('countdown');
+
+    // Use the freshest location available: a new fix if the device gives one quickly, else the last known.
+    alertCoordsRef.current = coordsRef.current;
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          alertCoordsRef.current = { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy };
+        },
+        () => {
+          /* keep the last known location */
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+      );
+    }
+
+    startRecording();
+    let remaining = prefsRef.current.seconds;
+    setCountdown(remaining);
+    clearCountdown();
+    countdownTimerRef.current = window.setInterval(() => {
       remaining -= 1;
-      setCountdown(remaining);
+      setCountdown(Math.max(remaining, 0));
       if (remaining <= 0) {
-        if (countdownRef.current !== null) window.clearInterval(countdownRef.current);
-        countdownRef.current = null;
-        if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
-        setCountdown(null);
-        setAlertReady(true);
-        setStatus('Alert prepared. Audio is ready to share; this browser cannot silently send SMS or audio files.');
+        clearCountdown();
+        finishCountdown();
       }
     }, 1000);
   };
 
-  const startMonitoring = async () => {
-    setError(''); setAlertReady(false); setAudioUrl(null); triggeredRef.current = false;
-    if (!navigator.mediaDevices?.getUserMedia) { setError('Microphone access requires HTTPS or localhost and a supported browser.'); return; }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      monitoringRef.current = true;
-      setMonitoring(true);
-      setStatus('Monitoring active on this page. Keep this page open and the device awake.');
-      // Speech recognition where the browser provides it.
-      const w = window as any;
-      const Recognition = w.SpeechRecognition || w.webkitSpeechRecognition;
-      if (Recognition) {
-        const rec = new Recognition();
-        recognitionRef.current = rec;
-        rec.lang = ({ en: 'en-IN', ta: 'ta-IN', hi: 'hi-IN', te: 'te-IN', mr: 'mr-IN', ml: 'ml-IN', gu: 'gu-IN', kn: 'kn-IN' } as Record<string,string>)[language] || 'en-IN';
-        rec.continuous = true; rec.interimResults = true;
-        rec.onresult = (event: any) => {
-          let transcript = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) transcript += ` ${event.results[i][0]?.transcript || ''}`;
-          const normalized = transcript.toLocaleLowerCase();
-          const phrases = [...PHRASES[language] || [], ...PHRASES.en];
-          const match = phrases.find(p => normalized.includes(p.toLocaleLowerCase()));
-          if (match) triggerAlert(`Emergency phrase recognized: ${match}`);
-        };
-        rec.onerror = () => setStatus('Microphone is active, but speech recognition is unavailable or interrupted. Loud-sound detection may still work while this page stays open.');
-        rec.onend = () => { if (monitoringRef.current && recognitionRef.current === rec) { try { rec.start(); } catch { /* browser may block restart */ } } };
-        try { rec.start(); } catch { /* continue with sound level detection */ }
-      }
-      // Best-effort loud-sound detection (threshold only; not a reliable scream classifier).
-      try {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx) {
-          const ctx = new AudioCtx(); audioContextRef.current = ctx;
-          const source = ctx.createMediaStreamSource(stream); const analyser = ctx.createAnalyser(); analyser.fftSize = 1024; source.connect(analyser);
-          const data = new Uint8Array(analyser.fftSize); let loudSince = 0;
-          timerRef.current = window.setInterval(() => {
-            if (!monitoringRef.current || triggeredRef.current) return;
-            analyser.getByteTimeDomainData(data);
-            let sum = 0; for (const v of data) { const x = (v - 128) / 128; sum += x * x; }
-            const rms = Math.sqrt(sum / data.length);
-            if (rms > 0.22) { if (!loudSince) loudSince = Date.now(); if (Date.now() - loudSince > 1200) triggerAlert('Sustained loud sound detected (possible false alarm).'); }
-            else loudSince = 0;
-          }, 250);
-        }
-      } catch { /* speech phrase detection can still operate */ }
-    } catch {
-      setMonitoring(false); monitoringRef.current = false;
-      setError('Microphone permission was denied or unavailable. Allow microphone access in Chrome site settings and try again.');
-      setStatus('Monitoring is off.');
-    }
+  const cancelAlert = () => {
+    clearCountdown();
+    stopRecorder(true); // a cancelled alert keeps no recording
+    revokeAudio();
+    triggeredRef.current = false;
+    suppressUntilRef.current = Date.now() + CANCEL_COOLDOWN_MS;
+    phraseGate.current.reset();
+    loudGate.current.reset();
+    setPhase('idle');
+    setStatusCode('cancelled');
   };
 
-  const cancelAlert = () => {
-    if (countdownRef.current !== null) window.clearInterval(countdownRef.current);
-    countdownRef.current = null; setCountdown(null); triggeredRef.current = false; setAlertReady(false);
-    if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
-    setStatus('Alert cancelled by the user. Monitoring remains active.');
+  const dismissReady = () => {
+    triggeredRef.current = false;
+    suppressUntilRef.current = Date.now() + AFTER_DISMISS_COOLDOWN_MS;
+    phraseGate.current.reset();
+    loudGate.current.reset();
+    setPhase('idle');
+    setStatusCode(monitoringRef.current ? 'active' : 'stopped');
   };
+
+  const alertMessage = alertCoords ? buildAlertText(alertCoords, null, language) : D.vmNoLocMsg;
 
   const shareAudio = async () => {
     if (!audioUrl) return;
     try {
-      const response = await fetch(audioUrl); const blob = await response.blob();
+      const blob = await (await fetch(audioUrl)).blob();
       const file = new File([blob], 'sahayini-emergency-voice.webm', { type: blob.type || 'audio/webm' });
       if (navigator.canShare?.({ files: [file] }) && navigator.share) {
-        await navigator.share({ title: 'SAHAYINI Emergency Voice Message', text: alertText, files: [file] });
-        setStatus('Share sheet opened. Select a trusted contact and confirm sending.');
+        await navigator.share({ title: D.vmTitle, text: alertMessage, files: [file] });
+        setAudioNotice('shared');
       } else {
-        const a = document.createElement('a'); a.href = audioUrl; a.download = file.name; a.click();
-        setStatus('Audio downloaded. Attach it manually in your messaging app; this browser does not support direct audio sharing.');
+        const a = document.createElement('a');
+        a.href = audioUrl;
+        a.download = file.name;
+        a.click();
+        setAudioNotice('downloaded');
       }
     } catch (e) {
-      if ((e as Error)?.name !== 'AbortError') setError('Could not open audio sharing. Use Download audio, then attach it to a message.');
+      if ((e as Error)?.name !== 'AbortError') setErrorCode('shareFail');
     }
   };
 
-  useEffect(() => () => {
-    monitoringRef.current = false;
-    if (countdownRef.current !== null) window.clearInterval(countdownRef.current);
-    stopAudioDetection();
-    try { recognitionRef.current?.stop(); } catch { /* ignore */ }
-    streamRef.current?.getTracks().forEach(track => track.stop());
-    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+  /* ---------- lifecycle ---------- */
+
+  // Settings and mic permission are remembered: if the user enabled monitoring before and the browser
+  // still has microphone permission, monitoring resumes on its own (no extra button press).
+  useEffect(() => {
+    let cancelled = false;
+    let perm: any = null;
+    (async () => {
+      if (!supported) {
+        if (prefsRef.current.enabled) setStatusCode('unsupported');
+        return;
+      }
+      try {
+        const perms = (navigator as any).permissions;
+        if (perms?.query) {
+          perm = await perms.query({ name: 'microphone' });
+          perm.onchange = () => {
+            if (perm.state === 'denied') {
+              setPermDenied(true);
+              if (monitoringRef.current) teardown();
+              setStatusCode('denied');
+            } else {
+              setPermDenied(false);
+            }
+          };
+          if (cancelled) return;
+          if (perm.state === 'denied') {
+            setPermDenied(true);
+            setStatusCode('denied');
+            return;
+          }
+          if (prefsRef.current.enabled) {
+            if (perm.state === 'granted') await startMonitoring(true);
+            else setStatusCode('needsTap'); // browser would prompt: that needs a user tap
+          }
+          return;
+        }
+      } catch {
+        /* Permissions API unavailable for the microphone: fall through */
+      }
+      // Cannot tell whether permission is still granted, so never prompt without a tap.
+      if (prefsRef.current.enabled) setStatusCode('needsTap');
+    })();
+    return () => {
+      cancelled = true;
+      if (perm) perm.onchange = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <section className="rounded-3xl border border-rose-200 bg-white p-5 sm:p-6 shadow-sm space-y-4" aria-label="Automatic voice safety monitor">
-    <div className="flex items-start gap-3">
-      <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0"><ShieldAlert className="w-6 h-6" /></div>
-      <div className="flex-1"><h2 className="text-lg font-extrabold text-slate-900">{ui.title}</h2><p className="text-sm text-slate-600 mt-1">{ui.desc}</p></div>
-    </div>
-    <div className={`rounded-xl p-3 text-sm border ${monitoring ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-700'}`}><div className="flex items-center gap-2 font-bold">{monitoring ? <CheckCircle2 className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}{monitoring ? ui.active : ui.off}</div><p className="mt-1">{status}</p></div>
-    <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-      <label className="text-sm font-semibold text-slate-700 flex-1">{ui.count}
-        <select value={seconds} disabled={countdown !== null} onChange={e => setSeconds(Number(e.target.value))} className="mt-1 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm"><option value={10}>10 seconds (recommended)</option><option value={5}>5 seconds</option><option value={15}>15 seconds</option><option value={20}>20 seconds</option><option value={30}>30 seconds</option></select>
-      </label>
-      {!monitoring ? <button onClick={startMonitoring} className="min-h-11 rounded-xl bg-rose-600 px-4 py-3 font-bold text-white flex items-center justify-center gap-2"><Mic className="w-4 h-4" />{ui.enable}</button> : <button onClick={stopMonitoring} className="min-h-11 rounded-xl border border-slate-300 px-4 py-3 font-bold text-slate-800 flex items-center justify-center gap-2"><MicOff className="w-4 h-4" />{ui.stop}</button>}
-    </div>
-    {error && <p role="alert" className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-800">{error}</p>}
-    {countdown !== null && <div className="rounded-2xl bg-red-50 border border-red-300 p-4 space-y-3"><div className="flex items-center gap-2 text-red-800 font-extrabold"><AlertTriangle className="w-5 h-5" />{ui.detected}</div><p className="text-sm text-red-800">{reason}</p><div className="flex items-center gap-2 text-3xl font-black text-red-700"><Timer className="w-7 h-7" />{countdown}s</div><p className="text-xs text-red-800">A short voice recording is being captured if recording is supported. Cancel if you are safe.</p><button onClick={cancelAlert} className="w-full rounded-xl bg-white border-2 border-red-500 text-red-700 font-extrabold py-3 flex items-center justify-center gap-2"><XCircle className="w-5 h-5" />{ui.cancel}</button></div>}
-    {recording && <p className="text-sm font-semibold text-rose-700 flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-red-600 animate-pulse" />{ui.recording}</p>}
-    {alertReady && <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 space-y-3"><h3 className="font-extrabold text-amber-950">{ui.prepared}</h3><p className="text-sm text-amber-900">{ui.preparedDesc}</p>
-      {audioUrl && <div className="space-y-2"><audio controls src={audioUrl} className="w-full" /><div className="flex flex-wrap gap-2"><button onClick={shareAudio} className="rounded-lg bg-[#0A2E65] text-white px-3 py-2 text-sm font-bold flex items-center gap-2"><Share2 className="w-4 h-4" />{ui.share}</button><a href={audioUrl} download="sahayini-emergency-voice.webm" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold flex items-center gap-2"><Download className="w-4 h-4" />{ui.download}</a></div></div>}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{contacts.filter(c => c.phone).map(c => <a key={c.id} href={`sms:${encodeURIComponent(c.phone)}?body=${encodeURIComponent(alertText)}`} className="rounded-lg bg-white border border-rose-200 px-3 py-2 text-sm font-bold text-rose-800 flex items-center gap-2"><PhoneCall className="w-4 h-4" />{ui.sms} {c.name}</a>)}</div>
-      {mapLink ? <a href={mapLink} target="_blank" rel="noreferrer" className="text-sm underline text-blue-800 flex items-center gap-2"><MapPin className="w-4 h-4" />{ui.openLocation}</a> : <p className="text-xs text-slate-600">{ui.noLocation}</p>}
-      <p className="text-xs text-amber-900">Nearby police stations can be found in the Nearby Police section below. Finding a station does not send an alert to that station.</p>
-    </div>}
-    <p className="text-xs text-slate-500">{ui.note}</p>
-  </section>;
+  // Keep speech recognition in the selected language.
+  useEffect(() => {
+    languageRef.current = language;
+    if (monitoringRef.current && speechSupported) {
+      // Restart recognition with the new locale (also recovers if it had stopped for the old language).
+      stopRecognition();
+      setSpeechNote('none');
+      const t = window.setTimeout(() => {
+        if (monitoringRef.current && !recognitionRef.current) startRecognition();
+      }, 350);
+      return () => window.clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
+
+  // After the tab was hidden the browser may have stopped the microphone or recognition: recover or report.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.hidden || !monitoringRef.current) return;
+      const s = streamRef.current;
+      const dead = !s || s.getAudioTracks().every((t) => t.readyState === 'ended');
+      if (dead) {
+        teardown();
+        void startMonitoring(true);
+        return;
+      }
+      if (!recognitionRef.current && speechSupported) startRecognition();
+      void audioCtxRef.current?.resume?.().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Escape closes the status dialog.
+  useEffect(() => {
+    if (!showStatus) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowStatus(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showStatus]);
+
+  // Release the microphone, timers and recording when leaving the SOS page.
+  useEffect(
+    () => () => {
+      monitoringRef.current = false;
+      if (countdownTimerRef.current !== null) window.clearInterval(countdownTimerRef.current);
+      if (loudTimerRef.current !== null) window.clearInterval(loudTimerRef.current);
+      if (audioCtxRef.current) void audioCtxRef.current.close().catch(() => {});
+      const rec = recognitionRef.current;
+      recognitionRef.current = null;
+      try {
+        rec?.stop();
+      } catch {
+        /* ignore */
+      }
+      discardRef.current = true;
+      if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+      streamRef.current?.getTracks().forEach((t) => {
+        t.onended = null;
+        t.stop();
+      });
+      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    },
+    []
+  );
+
+  /* ---------- render ---------- */
+
+  const statusText: Record<StatusCode, string> = {
+    off: D.vmStatusOff,
+    active: running ? D.vmStatusActive : warmup ? D.vmStarting : D.vmNotListening,
+    stopped: D.vmStatusStopped,
+    unsupported: D.vmUnsupported,
+    denied: D.vmDenied,
+    needsTap: D.vmNeedsTap,
+    countdown: D.vmCountdownStatus,
+    cancelled: D.vmCancelled,
+    prepared: D.vmPreparedStatus,
+  };
+  const errorText: Record<ErrorCode, string> = {
+    denied: D.vmDenied,
+    unsupported: D.vmUnsupported,
+    noRecorder: D.vmNoRecorder,
+    recordFail: D.vmRecordFail,
+    shareFail: D.vmShareFail,
+  };
+  const reasonText = reason ? (reason.kind === 'phrase' ? fill(D.vmReasonPhrase, { p: reason.phrase }) : D.vmReasonLoud) : '';
+  const speechText =
+    speechNote === 'langUnsupported' ? D.vmLangUnsupported : speechNote === 'unavailable' ? D.vmNoSpeech : speechNote === 'interrupted' ? D.vmSpeechIssue : '';
+
+  const pill = running
+    ? { text: D.vmActive, cls: 'border-emerald-300 bg-emerald-100 text-emerald-900', dot: 'bg-emerald-600' }
+    : monitoring
+    ? warmup
+      ? { text: D.vmStarting, cls: 'border-slate-300 bg-white text-slate-700', dot: 'bg-slate-400' }
+      : { text: D.vmUnavailable, cls: 'border-slate-300 bg-slate-100 text-slate-700', dot: 'bg-slate-400' }
+    : unavailable
+    ? { text: D.vmUnavailable, cls: 'border-slate-300 bg-slate-100 text-slate-700', dot: 'bg-slate-400' }
+    : { text: D.vmInactive, cls: 'border-slate-300 bg-white text-slate-700', dot: 'bg-slate-400' };
+
+  const mainBtn = 'flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-extrabold transition';
+
+  return (
+    <>
+      <SosCard id="sos-voice" title={D.vmTitle} desc={D.vmDesc} tone="sky" icon={<ShieldCheck className="h-7 w-7 text-emerald-700" />}>
+        <div role="status" aria-live="polite" className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold ${pill.cls}`}>
+          {running ? <Mic className="h-4 w-4" aria-hidden="true" /> : <MicOff className="h-4 w-4" aria-hidden="true" />}
+          <span>{pill.text}</span>
+          <span className={`h-2.5 w-2.5 rounded-full ${pill.dot}`} aria-hidden="true" />
+        </div>
+
+        {monitoring && !warmup && speechText && (
+          <p role="status" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs leading-relaxed text-slate-700">{speechText}</p>
+        )}
+
+        {!monitoring && !unavailable && (
+          <button type="button" onClick={() => void startMonitoring(false)} className={`${mainBtn} bg-emerald-700 text-white shadow-sm hover:bg-emerald-800`}>
+            <Mic className="h-4 w-4" aria-hidden="true" /> {D.vmEnable}
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setShowStatus(true)}
+          aria-haspopup="dialog"
+          className={`${mainBtn} mt-auto border-2 border-[#0A2E65] bg-white text-[#0A2E65] hover:bg-slate-50`}
+        >
+          {D.vmViewStatus}
+        </button>
+      </SosCard>
+
+      {/* Status and settings */}
+      {showStatus && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4" onClick={() => setShowStatus(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="vm-status-title"
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h2 id="vm-status-title" className="text-base font-extrabold text-[#0A2E65]">{D.vmTitle}</h2>
+              <button type="button" onClick={() => setShowStatus(false)} aria-label={D.vmClose} className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-600 hover:bg-slate-100">
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className={`mt-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold ${pill.cls}`}>
+              <span className={`h-2.5 w-2.5 rounded-full ${pill.dot}`} aria-hidden="true" />
+              {pill.text}
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-slate-700">{statusText[statusCode]}</p>
+            {speechText && monitoring && <p className="mt-1 text-xs leading-relaxed text-slate-700">{speechText}</p>}
+            {errorCode && <p role="alert" className="mt-2 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-800">{errorText[errorCode]}</p>}
+
+            <dl className="mt-3 grid grid-cols-1 gap-1.5 text-xs">
+              {([[D.vmDetPhrase, detectors.phrase], [D.vmDetLoud, detectors.loud]] as const).map(([label, on]) => (
+                <div key={label} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+                  <dt className="font-semibold text-slate-800">{label}</dt>
+                  <dd className={`font-bold ${on ? 'text-emerald-700' : 'text-slate-500'}`}>{on ? D.vmOn : D.vmOff}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <label htmlFor="vm-countdown" className="mt-4 block text-xs font-bold text-slate-800">
+              {D.vmCountdownLabel}
+            </label>
+            <select
+              id="vm-countdown"
+              value={prefs.seconds}
+              disabled={phase === 'countdown'}
+              onChange={(e) => updatePrefs({ seconds: normalizeCountdown(e.target.value) })}
+              className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
+            >
+              {COUNTDOWN_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {fill(D.vmSecs, { n })}
+                  {n === DEFAULT_COUNTDOWN ? ` ${D.vmRecommended}` : ''}
+                </option>
+              ))}
+            </select>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {monitoring ? (
+                <>
+                  <button type="button" onClick={stopMonitoring} className="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full border-2 border-[#0A2E65] bg-white px-4 py-2 text-sm font-extrabold text-[#0A2E65]">
+                    <MicOff className="h-4 w-4" aria-hidden="true" /> {D.vmStop}
+                  </button>
+                  {(!running || !detectors.loud || (!detectors.phrase && speechSupported && speechNote !== 'langUnsupported')) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        teardown();
+                        void startMonitoring(false);
+                      }}
+                      className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-full bg-emerald-700 px-4 py-2 text-sm font-extrabold text-white"
+                    >
+                      {D.vmRestart}
+                    </button>
+                  )}
+                </>
+              ) : (
+                !unavailable && (
+                  <button type="button" onClick={() => void startMonitoring(false)} className="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 py-2 text-sm font-extrabold text-white">
+                    <Mic className="h-4 w-4" aria-hidden="true" /> {D.vmEnable}
+                  </button>
+                )
+              )}
+            </div>
+
+            <div className="mt-4 space-y-2 text-[11px] leading-relaxed text-slate-600">
+              <p className="flex items-start gap-1.5"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /><span>{D.vmGuard}</span></p>
+              <p className="flex items-start gap-1.5"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /><span>{D.vmLimits}</span></p>
+              <p className="flex items-start gap-1.5"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /><span>{D.vmPrivacy}</span></p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Countdown: shown over everything so it cannot be missed or scrolled away */}
+      {phase === 'countdown' && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="vm-cd-title" aria-describedby="vm-cd-desc" className="w-full max-w-sm rounded-3xl border-2 border-orange-300 bg-white p-6 text-center shadow-2xl">
+            <div className="flex items-center justify-center gap-2 text-orange-700">
+              <AlertTriangle className="h-6 w-6" aria-hidden="true" />
+              <h2 id="vm-cd-title" className="text-lg font-extrabold">{D.vmDetected}</h2>
+            </div>
+            <p id="vm-cd-desc" className="mt-1 text-xs text-slate-700">{reasonText}</p>
+            <div className="my-4 flex items-center justify-center gap-2 text-5xl font-black text-[#0A2E65]" aria-live="assertive">
+              <Timer className="h-8 w-8" aria-hidden="true" />
+              <span>{countdown}</span>
+            </div>
+            {recording && (
+              <p className="mb-3 flex items-center justify-center gap-2 text-xs font-semibold text-slate-700">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-orange-500" aria-hidden="true" /> {D.vmRecording}
+              </p>
+            )}
+            {errorCode && <p className="mb-3 text-xs text-slate-700">{errorText[errorCode]}</p>}
+            <button type="button" autoFocus onClick={cancelAlert} className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#0A2E65] px-4 py-3 text-sm font-extrabold text-white hover:bg-[#072344]">
+              {D.vmCancelBtn}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Alert prepared: the user must still send it */}
+      {phase === 'ready' && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/60 p-0 sm:items-center sm:p-4">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="vm-ready-title" className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
+            <h2 id="vm-ready-title" className="text-base font-extrabold text-[#0A2E65]">{D.vmPreparedTitle}</h2>
+            <p className="mt-1 text-xs leading-relaxed text-slate-700">{D.vmPreparedDesc}</p>
+            <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs leading-relaxed text-slate-800 select-all">{alertMessage}</p>
+
+            {audioUrl && (
+              <div className="mt-3 space-y-2">
+                <audio controls src={audioUrl} className="w-full" />
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => void shareAudio()} className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg bg-[#0A2E65] px-3 py-2 text-xs font-bold text-white">
+                    <Share2 className="h-4 w-4" aria-hidden="true" /> {D.vmShareAudio}
+                  </button>
+                  <a href={audioUrl} download="sahayini-emergency-voice.webm" onClick={() => setAudioNotice('downloaded')} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800">
+                    <Download className="h-4 w-4" aria-hidden="true" /> {D.vmDownloadAudio}
+                  </a>
+                </div>
+              </div>
+            )}
+            {audioNotice && (
+              <p role="status" className="mt-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                {audioNotice === 'shared' ? D.vmAudioShared : D.vmAudioDownloaded}
+              </p>
+            )}
+            {errorCode && <p role="alert" className="mt-2 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-800">{errorText[errorCode]}</p>}
+
+            <div className="mt-3 grid grid-cols-1 gap-2">
+              {recipients.selected.length === 0 ? (
+                <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">{D.vmNoRecipients}</p>
+              ) : (
+                recipients.selected.map((c) => (
+                  <a key={c.id} href={smsHref([c.phone], alertMessage)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-900">
+                    <PhoneCall className="h-4 w-4" aria-hidden="true" /> {fill(D.vmSmsTo, { name: contactName(c, ss) })}
+                  </a>
+                ))
+              )}
+              <a href="tel:112" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-extrabold text-white hover:bg-red-700">
+                <PhoneCall className="h-4 w-4" aria-hidden="true" /> {D.call112}
+              </a>
+            </div>
+
+            {alertCoords ? (
+              <a href={mapsLink(alertCoords)} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-blue-800 underline">
+                <ExternalLink className="h-4 w-4" aria-hidden="true" /> {D.vmOpenLocation}
+              </a>
+            ) : (
+              <p className="mt-3 text-xs text-slate-600">{D.vmNoLocation}</p>
+            )}
+
+            <button type="button" onClick={dismissReady} className="mt-4 min-h-11 w-full cursor-pointer rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50">
+              {D.vmDismiss}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 };

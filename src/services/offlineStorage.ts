@@ -1,7 +1,6 @@
 import { SCHEMES_DATA, SCHEMES_LOCALIZATION, LocalizedSchemeDetails, getLocalizedScheme } from '../data/schemesData';
 import { LanguageCode, SchemeItem, EmergencyContact } from '../types';
-import { translations } from '../i18n/translations';
-import { getDefaultOfflineAnswer } from './offlineChatAnswers';
+import { findLocalAnswer, OFFLINE_LABELS } from './askKnowledge';
 
 export interface EmergencyHelpline {
   id: string;
@@ -589,105 +588,32 @@ class OfflineStorageManager {
   public getOfflineChatResult(
     query: string,
     language: LanguageCode
-  ): { text: string; matched: boolean } {
-    const matched = this.matchOfflineChatTopic(query, language);
-    if (matched !== null) return { text: matched, matched: true };
-    return { text: this.getGenericOfflineChatText(), matched: false };
-  }
+  ): { text: string; matched: boolean; kind?: 'starter' | 'topic' } {
+    const local = findLocalAnswer(query, language, { topics: true });
+    if (!local) return { text: this.getGenericOfflineChatText(), matched: false };
+    if (local.kind === 'starter') return { text: local.text, matched: true, kind: 'starter' };
 
-  public getOfflineChatResponse(query: string, language: LanguageCode): string {
-    return this.getOfflineChatResult(query, language).text;
-  }
-
-  private matchOfflineChatTopic(query: string, language: LanguageCode): string | null {
-    const q = query.toLowerCase().trim();
-
-    // Match the 20 starter questions exactly in the currently selected language.
-    // Suggestions and saved answers share a stable index and this lookup is local.
-    const normalizeQuestion = (value: string) => value
-      .normalize('NFKC')
-      .toLocaleLowerCase()
-      .replace(/[’‘]/g, "'")
-      .replace(/[?？!！.。]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    const normalizedQuery = normalizeQuestion(query);
-    const suggestions = translations[language]?.ask?.suggestions || translations.en.ask.suggestions;
-    const localizedIndex = suggestions.findIndex((suggestion) => normalizeQuestion(suggestion) === normalizedQuery);
-    const englishIndex = translations.en.ask.suggestions.findIndex((suggestion) => normalizeQuestion(suggestion) === normalizedQuery);
-    const starterIndex = localizedIndex >= 0 ? localizedIndex : englishIndex;
-    if (starterIndex >= 0) {
-      const savedAnswer = getDefaultOfflineAnswer(starterIndex, language);
-      if (savedAnswer) return `💾 **[Offline saved answer]**\n\n${savedAnswer}`;
-    }
-
-    // 1. Scholarships & Government Schemes query
-    if (
-      q.includes('scholarship') ||
-      q.includes('scheme') ||
-      q.includes('yojana') ||
-      q.includes('படிப்பக') ||
-      q.includes('படிப்பு') ||
-      q.includes('திட்டம்') ||
-      q.includes('छात्रवृत्ति') ||
-      q.includes('योजना') ||
-      q.includes('స్కాలర్') ||
-      q.includes('పథకం') ||
-      q.includes('ಶಿಷ್ಯ') ||
-      q.includes('ಯೋಜನೆ')
-    ) {
+    // Topic answers built from this device's saved data are labelled, in the selected language, as offline answers.
+    const L = OFFLINE_LABELS[language] || OFFLINE_LABELS.en;
+    let body = local.text;
+    if (local.index === 15) {
+      // Government-scheme / scholarship question: list real schemes saved on the device (localised text when available).
       const cached = this.getCachedSchemes({ language }).slice(0, 3);
       if (cached.length > 0) {
         const list = cached
           .map((s, idx) => {
             const loc = s.localized ? s.localized[language] : null;
-            const title = loc?.title || s.title;
-            const benefits = loc?.benefits || s.benefits;
-            return `${idx + 1}. **${title}**\n   - Benefits: ${benefits}\n   - Portal: ${s.officialUrl}`;
+            return `${idx + 1}. ${loc?.title || s.title}\n   - ${L.benefits}: ${loc?.benefits || s.benefits}\n   - ${L.portal}: ${s.officialUrl}`;
           })
           .join('\n\n');
-        return `💾 **[Offline Cached Response] Verified Government Schemes:**\n\n${list}\n\n*Note: All details loaded directly from your device's offline cache. You can view full document requirements in the Schemes tab.*`;
+        body = `${L.schemesTitle}\n\n${list}\n\n${local.text}`;
       }
     }
+    return { text: `${L.header}\n\n${body}`, matched: true, kind: 'topic' };
+  }
 
-    // 2. Emergency / SOS / Police query
-    if (
-      q.includes('sos') ||
-      q.includes('emergency') ||
-      q.includes('police') ||
-      q.includes('help') ||
-      q.includes('112') ||
-      q.includes('ஆபத்து') ||
-      q.includes('அவசர') ||
-      q.includes('कांटेक्ट') ||
-      q.includes('आपात')
-    ) {
-      const helplines = this.getCachedHelplines().slice(0, 5);
-      const list = helplines.map((h) => `• **${h.number}** — ${h.title} (${h.availableHours})`).join('\n');
-      return `🚨 **[Offline Cached Response] Immediate Emergency Helplines:**\n\n${list}\n\n*Zero Internet Required: You can dial any of these numbers directly through your phone dialer without 4G/5G mobile data.*`;
-    }
-
-    // 3. Scam / Fraud / Digital Arrest query
-    if (
-      q.includes('scam') ||
-      q.includes('fraud') ||
-      q.includes('digital arrest') ||
-      q.includes('cyber') ||
-      q.includes('மோசடி') ||
-      q.includes('धोखा') ||
-      q.includes('మోసం')
-    ) {
-      const playbooks = this.getCachedPlaybooks();
-      const cyber = playbooks.find((p) => p.category === 'cyber') || playbooks[0];
-      return `🛡️ **[Offline Cached Response] Cyber Defense Protocol:**\n\n**Golden Rule:** ${cyber.goldenRule}\n\n**Immediate Steps:**\n${cyber.immediateSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n*Helpline:* Dial **1930** immediately to report cyber financial theft within the golden hour.`;
-    }
-
-    // 4. UPI / Banking / Payment query
-    if (q.includes('upi') || q.includes('payment') || q.includes('pin') || q.includes('money') || q.includes('பணம்')) {
-      return `💳 **[Offline Cached Response] Safe Digital Payments & Offline Banking:**\n\n1. **Golden Rule:** Never enter your UPI PIN to RECEIVE money. UPI PIN is strictly used to debit funds.\n2. **Offline Banking Without Internet:** Dial **\*99\#** (NUUP USSD code) on any mobile phone to check bank balance or transfer funds over basic 2G network.\n3. **Financial Fraud Hotline:** Dial **1930** immediately if unauthorized transactions occur.`;
-    }
-
-    return null;
+  public getOfflineChatResponse(query: string, language: LanguageCode): string {
+    return this.getOfflineChatResult(query, language).text;
   }
 
   private getGenericOfflineChatText(): string {

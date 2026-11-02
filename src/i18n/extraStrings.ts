@@ -23,6 +23,13 @@ export interface ExtraStrings {
   chatErrModel: string;
   chatErrRateLimit: string;
   chatRetry: string;
+  chatLocalBadge: string;
+  chatTtsUnsupported: string;
+  chatMicUnsupported: string;
+  chatMicDenied: string;
+  chatMicNetwork: string;
+  chatMicNoSpeech: string;
+  chatMicLang: string;
   // Scam
   scamListen: string;
   scamReplay: string;
@@ -68,6 +75,13 @@ const en: ExtraStrings = {
   chatErrRateLimit:
     'SAHAYINI\'s AI has reached its usage limit for the moment. Please wait a minute and tap Retry. In an emergency, dial 112.',
   chatRetry: 'Retry',
+  chatLocalBadge: 'Saved answer (instant, works without internet)',
+  chatTtsUnsupported: 'Listening is not supported in this browser. You can read the answer as text.',
+  chatMicUnsupported: 'Voice input is not supported in this browser. Please type your question.',
+  chatMicDenied: 'Microphone permission was denied. Allow microphone access in your browser settings, or type your question.',
+  chatMicNetwork: 'Voice input needs an internet connection in most browsers and could not reach the speech service. Please type your question.',
+  chatMicNoSpeech: 'No speech was heard. Tap the microphone and speak again.',
+  chatMicLang: 'Voice input is not available for the selected language in this browser. Please type your question.',
   scamListen: 'Listen to analysis',
   scamReplay: 'Replay',
   scamStopAudio: 'Stop audio',
@@ -114,6 +128,13 @@ const ta: ExtraStrings = {
   chatErrRateLimit:
     'SAHAYINI-யின் AI தற்காலிகமாக பயன்பாட்டு வரம்பை எட்டியுள்ளது. ஒரு நிமிடம் காத்திருந்து \'மீண்டும் முயல்க\' என்பதை அழுத்தவும். அவசரநிலையில் 112-ஐ அழைக்கவும்.',
   chatRetry: 'மீண்டும் முயல்க',
+  chatLocalBadge: 'சேமித்த பதில் (உடனடி, இணையம் தேவையில்லை)',
+  chatTtsUnsupported: 'இந்த உலாவியில் கேட்கும் வசதி ஆதரிக்கப்படவில்லை. பதிலை எழுத்தில் படிக்கலாம்.',
+  chatMicUnsupported: 'இந்த உலாவியில் குரல் உள்ளீடு ஆதரிக்கப்படவில்லை. உங்கள் கேள்வியைத் தட்டச்சு செய்யவும்.',
+  chatMicDenied: 'மைக்ரோஃபோன் அனுமதி மறுக்கப்பட்டது. உலாவி அமைப்புகளில் அனுமதியை வழங்கவும் அல்லது கேள்வியைத் தட்டச்சு செய்யவும்.',
+  chatMicNetwork: 'பெரும்பாலான உலாவிகளில் குரல் உள்ளீட்டுக்கு இணையம் தேவை; பேச்சு சேவையை அடைய முடியவில்லை. கேள்வியைத் தட்டச்சு செய்யவும்.',
+  chatMicNoSpeech: 'எதுவும் கேட்கவில்லை. மைக்ரோஃபோனைத் தொட்டு மீண்டும் பேசவும்.',
+  chatMicLang: 'தேர்ந்தெடுத்த மொழிக்கான குரல் உள்ளீடு இந்த உலாவியில் இல்லை. கேள்வியைத் தட்டச்சு செய்யவும்.',
   scamListen: 'பகுப்பாய்வைக் கேளுங்கள்',
   scamReplay: 'மீண்டும் கேளுங்கள்',
   scamStopAudio: 'ஒலியை நிறுத்து',
@@ -160,6 +181,13 @@ const hi: ExtraStrings = {
   chatErrRateLimit:
     'SAHAYINI के AI की उपयोग सीमा अभी पूरी हो गई है। कृपया एक मिनट रुककर \'फिर कोशिश करें\' दबाएँ। आपात स्थिति में 112 पर कॉल करें।',
   chatRetry: 'फिर कोशिश करें',
+  chatLocalBadge: 'सहेजा हुआ उत्तर (तुरंत, इंटरनेट की ज़रूरत नहीं)',
+  chatTtsUnsupported: 'इस ब्राउज़र में सुनने की सुविधा उपलब्ध नहीं है। आप उत्तर पाठ में पढ़ सकते हैं।',
+  chatMicUnsupported: 'इस ब्राउज़र में आवाज़ से इनपुट उपलब्ध नहीं है। कृपया अपना प्रश्न टाइप करें।',
+  chatMicDenied: 'माइक्रोफ़ोन की अनुमति नहीं मिली। ब्राउज़र सेटिंग में अनुमति दें या अपना प्रश्न टाइप करें।',
+  chatMicNetwork: 'ज़्यादातर ब्राउज़र में आवाज़ इनपुट के लिए इंटरनेट चाहिए और स्पीच सेवा तक पहुँच नहीं हो सकी। कृपया प्रश्न टाइप करें।',
+  chatMicNoSpeech: 'कुछ सुनाई नहीं दिया। माइक्रोफ़ोन दबाकर फिर बोलें।',
+  chatMicLang: 'चुनी हुई भाषा के लिए इस ब्राउज़र में आवाज़ इनपुट उपलब्ध नहीं है। कृपया प्रश्न टाइप करें।',
   scamListen: 'विश्लेषण सुनें',
   scamReplay: 'दोबारा सुनें',
   scamStopAudio: 'ऑडियो रोकें',
@@ -206,6 +234,13 @@ const te: ExtraStrings = {
   chatErrRateLimit:
     'SAHAYINI AI తాత్కాలికంగా వినియోగ పరిమితిని చేరుకుంది. దయచేసి ఒక నిమిషం ఆగి \'మళ్లీ ప్రయత్నించండి\' నొక్కండి. అత్యవసర పరిస్థితిలో 112కి కాల్ చేయండి.',
   chatRetry: 'మళ్లీ ప్రయత్నించండి',
+  chatLocalBadge: 'సేవ్ చేసిన సమాధానం (తక్షణం, ఇంటర్నెట్ అవసరం లేదు)',
+  chatTtsUnsupported: 'ఈ బ్రౌజర్‌లో వినే సదుపాయం అందుబాటులో లేదు. సమాధానాన్ని వచనంలో చదవవచ్చు.',
+  chatMicUnsupported: 'ఈ బ్రౌజర్‌లో వాయిస్ ఇన్‌పుట్‌కు మద్దతు లేదు. దయచేసి మీ ప్రశ్నను టైప్ చేయండి.',
+  chatMicDenied: 'మైక్రోఫోన్ అనుమతి నిరాకరించబడింది. బ్రౌజర్ సెట్టింగ్‌లలో అనుమతి ఇవ్వండి లేదా ప్రశ్నను టైప్ చేయండి.',
+  chatMicNetwork: 'చాలా బ్రౌజర్లలో వాయిస్ ఇన్‌పుట్‌కు ఇంటర్నెట్ అవసరం; స్పీచ్ సేవను చేరుకోలేకపోయింది. దయచేసి ప్రశ్నను టైప్ చేయండి.',
+  chatMicNoSpeech: 'ఏమీ వినిపించలేదు. మైక్రోఫోన్‌ను నొక్కి మళ్లీ మాట్లాడండి.',
+  chatMicLang: 'ఎంచుకున్న భాషకు ఈ బ్రౌజర్‌లో వాయిస్ ఇన్‌పుట్ అందుబాటులో లేదు. దయచేసి ప్రశ్నను టైప్ చేయండి.',
   scamListen: 'విశ్లేషణ వినండి',
   scamReplay: 'మళ్లీ వినండి',
   scamStopAudio: 'ఆడియో ఆపండి',
@@ -252,6 +287,13 @@ const mr: ExtraStrings = {
   chatErrRateLimit:
     'SAHAYINI च्या AI ची वापर मर्यादा सध्या संपली आहे. कृपया एक मिनिट थांबा आणि \'पुन्हा प्रयत्न करा\' दाबा. आणीबाणीत 112 वर कॉल करा.',
   chatRetry: 'पुन्हा प्रयत्न करा',
+  chatLocalBadge: 'जतन केलेले उत्तर (तात्काळ, इंटरनेट नको)',
+  chatTtsUnsupported: 'या ब्राउझरमध्ये ऐकण्याची सुविधा उपलब्ध नाही. तुम्ही उत्तर मजकुरात वाचू शकता.',
+  chatMicUnsupported: 'या ब्राउझरमध्ये आवाजाद्वारे इनपुट उपलब्ध नाही. कृपया तुमचा प्रश्न टाइप करा.',
+  chatMicDenied: 'मायक्रोफोनची परवानगी नाकारली गेली. ब्राउझर सेटिंग्जमध्ये परवानगी द्या किंवा प्रश्न टाइप करा.',
+  chatMicNetwork: 'बहुतेक ब्राउझरमध्ये आवाज इनपुटसाठी इंटरनेट लागते आणि स्पीच सेवेपर्यंत पोहोचता आले नाही. कृपया प्रश्न टाइप करा.',
+  chatMicNoSpeech: 'काहीही ऐकू आले नाही. मायक्रोफोन दाबा आणि पुन्हा बोला.',
+  chatMicLang: 'निवडलेल्या भाषेसाठी या ब्राउझरमध्ये आवाज इनपुट उपलब्ध नाही. कृपया प्रश्न टाइप करा.',
   scamListen: 'विश्लेषण ऐका',
   scamReplay: 'पुन्हा ऐका',
   scamStopAudio: 'ऑडिओ थांबवा',
@@ -298,6 +340,13 @@ const ml: ExtraStrings = {
   chatErrRateLimit:
     'SAHAYINI-യുടെ AI താൽക്കാലികമായി ഉപയോഗ പരിധിയിൽ എത്തിയിരിക്കുന്നു. ഒരു മിനിറ്റ് കാത്തിരുന്ന് \'വീണ്ടും ശ്രമിക്കുക\' അമർത്തുക. അടിയന്തര സാഹചര്യത്തിൽ 112 വിളിക്കുക.',
   chatRetry: 'വീണ്ടും ശ്രമിക്കുക',
+  chatLocalBadge: 'സേവ് ചെയ്ത ഉത്തരം (ഉടൻ, ഇന്റർനെറ്റ് വേണ്ട)',
+  chatTtsUnsupported: 'ഈ ബ്രൗസറിൽ കേൾക്കാനുള്ള സൗകര്യം ലഭ്യമല്ല. ഉത്തരം എഴുത്തായി വായിക്കാം.',
+  chatMicUnsupported: 'ഈ ബ്രൗസറിൽ ശബ്ദ ഇൻപുട്ട് പിന്തുണയ്ക്കുന്നില്ല. ദയവായി നിങ്ങളുടെ ചോദ്യം ടൈപ്പ് ചെയ്യുക.',
+  chatMicDenied: 'മൈക്രോഫോൺ അനുമതി നിഷേധിക്കപ്പെട്ടു. ബ്രൗസർ ക്രമീകരണത്തിൽ അനുമതി നൽകുക അല്ലെങ്കിൽ ചോദ്യം ടൈപ്പ് ചെയ്യുക.',
+  chatMicNetwork: 'മിക്ക ബ്രൗസറുകളിലും ശബ്ദ ഇൻപുട്ടിന് ഇന്റർനെറ്റ് വേണം; സ്പീച്ച് സേവനത്തിൽ എത്താനായില്ല. ദയവായി ചോദ്യം ടൈപ്പ് ചെയ്യുക.',
+  chatMicNoSpeech: 'ഒന്നും കേട്ടില്ല. മൈക്രോഫോൺ അമർത്തി വീണ്ടും സംസാരിക്കുക.',
+  chatMicLang: 'തിരഞ്ഞെടുത്ത ഭാഷയ്ക്ക് ഈ ബ്രൗസറിൽ ശബ്ദ ഇൻപുട്ട് ലഭ്യമല്ല. ദയവായി ചോദ്യം ടൈപ്പ് ചെയ്യുക.',
   scamListen: 'വിശകലനം കേൾക്കുക',
   scamReplay: 'വീണ്ടും കേൾക്കുക',
   scamStopAudio: 'ഓഡിയോ നിർത്തുക',
@@ -344,6 +393,13 @@ const gu: ExtraStrings = {
   chatErrRateLimit:
     'SAHAYINI ના AI ની ઉપયોગ મર્યાદા હાલ પૂરી થઈ ગઈ છે. કૃપા કરીને એક મિનિટ રાહ જુઓ અને \'ફરી પ્રયાસ કરો\' દબાવો. કટોકટીમાં 112 પર કૉલ કરો.',
   chatRetry: 'ફરી પ્રયાસ કરો',
+  chatLocalBadge: 'સાચવેલો જવાબ (તરત, ઇન્ટરનેટ જરૂરી નથી)',
+  chatTtsUnsupported: 'આ બ્રાઉઝરમાં સાંભળવાની સુવિધા ઉપલબ્ધ નથી. તમે જવાબ ટેક્સ્ટમાં વાંચી શકો છો.',
+  chatMicUnsupported: 'આ બ્રાઉઝરમાં અવાજથી ઇનપુટ ઉપલબ્ધ નથી. કૃપા કરીને તમારો પ્રશ્ન ટાઇપ કરો.',
+  chatMicDenied: 'માઇક્રોફોનની પરવાનગી નકારાઈ. બ્રાઉઝર સેટિંગ્સમાં પરવાનગી આપો અથવા પ્રશ્ન ટાઇપ કરો.',
+  chatMicNetwork: 'મોટાભાગના બ્રાઉઝરમાં અવાજ ઇનપુટ માટે ઇન્ટરનેટ જોઈએ અને સ્પીચ સેવા સુધી પહોંચી શકાયું નથી. કૃપા કરીને પ્રશ્ન ટાઇપ કરો.',
+  chatMicNoSpeech: 'કશું સંભળાયું નહીં. માઇક્રોફોન દબાવી ફરી બોલો.',
+  chatMicLang: 'પસંદ કરેલી ભાષા માટે આ બ્રાઉઝરમાં અવાજ ઇનપુટ ઉપલબ્ધ નથી. કૃપા કરીને પ્રશ્ન ટાઇપ કરો.',
   scamListen: 'વિશ્લેષણ સાંભળો',
   scamReplay: 'ફરી સાંભળો',
   scamStopAudio: 'ઑડિયો બંધ કરો',
@@ -390,6 +446,13 @@ const kn: ExtraStrings = {
   chatErrRateLimit:
     'SAHAYINI ಯ AI ತಾತ್ಕಾಲಿಕವಾಗಿ ಬಳಕೆ ಮಿತಿ ತಲುಪಿದೆ. ದಯವಿಟ್ಟು ಒಂದು ನಿಮಿಷ ಕಾದು \'ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ\' ಒತ್ತಿ. ತುರ್ತು ಸಂದರ್ಭದಲ್ಲಿ 112 ಕ್ಕೆ ಕರೆ ಮಾಡಿ.',
   chatRetry: 'ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ',
+  chatLocalBadge: 'ಉಳಿಸಿದ ಉತ್ತರ (ತಕ್ಷಣ, ಇಂಟರ್ನೆಟ್ ಬೇಡ)',
+  chatTtsUnsupported: 'ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಕೇಳುವ ಸೌಲಭ್ಯ ಲಭ್ಯವಿಲ್ಲ. ಉತ್ತರವನ್ನು ಪಠ್ಯದಲ್ಲಿ ಓದಬಹುದು.',
+  chatMicUnsupported: 'ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಬೆಂಬಲಿತವಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಟೈಪ್ ಮಾಡಿ.',
+  chatMicDenied: 'ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ. ಬ್ರೌಸರ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಅನುಮತಿ ನೀಡಿ ಅಥವಾ ಪ್ರಶ್ನೆಯನ್ನು ಟೈಪ್ ಮಾಡಿ.',
+  chatMicNetwork: 'ಹೆಚ್ಚಿನ ಬ್ರೌಸರ್‌ಗಳಲ್ಲಿ ಧ್ವನಿ ಇನ್‌ಪುಟ್‌ಗೆ ಇಂಟರ್ನೆಟ್ ಬೇಕು ಮತ್ತು ಸ್ಪೀಚ್ ಸೇವೆಯನ್ನು ತಲುಪಲಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಪ್ರಶ್ನೆಯನ್ನು ಟೈಪ್ ಮಾಡಿ.',
+  chatMicNoSpeech: 'ಏನೂ ಕೇಳಿಸಲಿಲ್ಲ. ಮೈಕ್ರೊಫೋನ್ ಒತ್ತಿ ಮತ್ತೆ ಮಾತನಾಡಿ.',
+  chatMicLang: 'ಆಯ್ದ ಭಾಷೆಗೆ ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಲಭ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ಪ್ರಶ್ನೆಯನ್ನು ಟೈಪ್ ಮಾಡಿ.',
   scamListen: 'ವಿಶ್ಲೇಷಣೆ ಕೇಳಿ',
   scamReplay: 'ಮತ್ತೆ ಕೇಳಿ',
   scamStopAudio: 'ಆಡಿಯೋ ನಿಲ್ಲಿಸಿ',

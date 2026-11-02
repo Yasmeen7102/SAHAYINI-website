@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { getLocationStrings, fill, LocationStrings } from '../../i18n/locationStrings';
 import { mapsLink, smsHref, whatsappHref, isIndianMobile } from '../../utils/emergencyShare';
 import { NearbyStation, fetchNearbyPolice, NearbyPoliceError, telHref } from '../../utils/nearbyPolice';
+import { rememberLocation } from '../../utils/policeMaps';
 import { CapturedFix, buildCaptureMessage, canShareFiles, cameraErrorMessage, fitWithin, photoFileName } from '../../utils/photoShare';
 
 type Capture = CapturedFix;
@@ -31,7 +32,7 @@ const geoErrorMessage = (err: GeolocationPositionError, L: LocationStrings): str
  * Captures a fresh GPS fix and helps the user send it to chosen saved contacts.
  * Opening a message app only PREPARES a message. The browser cannot tell whether it was sent.
  */
-export const CaptureLocationCard: React.FC = () => {
+export const CaptureLocationCard: React.FC<{ autoCaptureKey?: number }> = ({ autoCaptureKey = 0 }) => {
   const { contacts, language } = useApp();
   const L = getLocationStrings(language);
   const [capture, setCapture] = useState<Capture | null>(null);
@@ -175,7 +176,7 @@ export const CaptureLocationCard: React.FC = () => {
         message:
           err?.kind === 'offline'
             ? 'You appear to be offline, so the nearest station cannot be looked up. You can still send to your contacts by SMS, or call 112.'
-            : err?.message || 'The nearest police station could not be looked up. Call 112 if you need help.',
+            : 'The nearest police station could not be looked up right now. You can still send your location to your contacts, or call 112.',
       });
     }
   };
@@ -204,6 +205,7 @@ export const CaptureLocationCard: React.FC = () => {
           accuracy: pos.coords.accuracy,
           capturedAt: new Date(pos.timestamp || Date.now()),
         };
+        rememberLocation(fix);
         setCapture(fix);
         setConsent(false);
         setBusy(false);
@@ -220,6 +222,13 @@ export const CaptureLocationCard: React.FC = () => {
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
+
+  // The SOS dashboard can ask for an immediate capture (one tap). Each new key triggers one capture;
+  // without the prop (e.g. on the Location page) nothing changes.
+  useEffect(() => {
+    if (autoCaptureKey > 0) capturePosition();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCaptureKey]);
 
   const policeStation = includePolice && police.status === 'found' ? police.station : null;
   // Only a real mobile number can receive SMS (landlines cannot).

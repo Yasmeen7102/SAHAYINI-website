@@ -45,7 +45,8 @@ for (const lang of LANGUAGES) {
   for (const question of suggestions) {
     starterCount++;
     const result = offlineStorage.getOfflineChatResult(question, lang.code);
-    if (!result.matched || !result.text.includes('Offline saved answer')) starterAnswersOk = false;
+    // Saved answers are plain text in the selected language (no English label or markdown inside the answer).
+    if (!result.matched || result.kind !== 'starter' || /Offline saved answer|\*\*/.test(result.text)) starterAnswersOk = false;
   }
 }
 check(`offline: all ${starterCount} localized starter questions return saved answers`, starterAnswersOk && starterCount === 160);
