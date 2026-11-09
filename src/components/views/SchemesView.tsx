@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { SCHEMES_DATA, getLocalizedScheme } from '../../data/schemesData';
+import { fetchGovernmentSchemes } from '../../data/supabaseSchemes';
 import { SchemeItem } from '../../types';
 import { SchemeDetailModal } from '../modals/SchemeDetailModal';
 import { OfflineSafetyKitModal } from '../common/OfflineSafetyKitModal';
@@ -27,6 +28,47 @@ export const SchemesView: React.FC = () => {
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [selectedScheme, setSelectedScheme] = useState<SchemeItem | null>(null);
   const [showOfflineKitModal, setShowOfflineKitModal] = useState(false);
+  const [schemes, setSchemes] = useState<SchemeItem[]>(SCHEMES_DATA);
+const [isLoadingSchemes, setIsLoadingSchemes] = useState(false);
+useEffect(() => {
+  let isMounted = true;
+
+  const loadSchemes = async () => {
+    if (isOffline) {
+      setSchemes(SCHEMES_DATA);
+      setIsLoadingSchemes(false);
+      return;
+    }
+
+    setIsLoadingSchemes(true);
+
+    try {
+      const remoteSchemes = await fetchGovernmentSchemes();
+
+      if (isMounted) {
+        setSchemes(
+          remoteSchemes.length > 0 ? remoteSchemes : SCHEMES_DATA
+        );
+      }
+    } catch (error) {
+      console.error('Could not load schemes from Supabase:', error);
+
+      if (isMounted) {
+        setSchemes(SCHEMES_DATA);
+      }
+    } finally {
+      if (isMounted) {
+        setIsLoadingSchemes(false);
+      }
+    }
+  };
+
+  loadSchemes();
+
+  return () => {
+    isMounted = false;
+  };
+}, [isOffline]);
 
   const filterOptions = [
     'All Schemes',
@@ -44,7 +86,7 @@ export const SchemesView: React.FC = () => {
 
   // Filtering logic
   const filteredSchemes = useMemo(() => {
-    return SCHEMES_DATA.filter((scheme) => {
+    return schemes.filter((scheme) => {
       // Saved filter
       if (showSavedOnly && !savedSchemeIds.includes(scheme.id)) {
         return false;
@@ -80,7 +122,7 @@ export const SchemesView: React.FC = () => {
 
       return true;
     });
-  }, [searchQuery, selectedFilter, showSavedOnly, savedSchemeIds]);
+  }, [schemes, searchQuery, selectedFilter, showSavedOnly, savedSchemeIds]);
 
   const clearAllFilters = () => {
     setSearchQuery('');
@@ -115,7 +157,11 @@ export const SchemesView: React.FC = () => {
             title="All 15 schemes are cached locally on your device for low-connectivity rural access"
           >
             <HardDrive className="w-3.5 h-3.5 text-emerald-600" />
-            <span>15 Schemes Cached Offline</span>
+            <span>
+  {isOffline
+    ? `${SCHEMES_DATA.length} Schemes Cached Offline`
+    : `${schemes.length} Schemes Available`}
+</span>
           </button>
 
           {(selectedFilter !== 'All Schemes' || searchQuery || showSavedOnly) && (
@@ -209,7 +255,13 @@ export const SchemesView: React.FC = () => {
       </div>
 
       {/* Scheme Cards Grid matching Image 6 (3 columns) */}
-      {filteredSchemes.length === 0 ? (
+      {isLoadingSchemes ? (
+  <div className="p-12 text-center bg-white rounded-3xl border border-slate-200">
+    <p className="text-sm font-semibold text-slate-600">
+      Loading government schemes...
+    </p>
+  </div>
+) : filteredSchemes.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 space-y-3">
           <p className="text-base font-bold text-slate-800">{t.schemes.noSchemesFound}</p>
           <p className="text-xs text-slate-500">{t.schemes.noSchemesDesc}</p>
