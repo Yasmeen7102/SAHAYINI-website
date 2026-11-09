@@ -18,15 +18,21 @@ type SupabaseSchemeRow = {
 const normalizeName = (value: string) =>
   value.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-const toStringArray = (value: string | null | undefined): string[] => {
-  if (!value?.trim()) return [];
+const toStringArray = (value: unknown): string[] => {
+  if (typeof value !== 'string') {
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item).trim()).filter(Boolean);
+    }
+    return [];
+  }
+
+  if (!value.trim()) return [];
 
   return value
     .split(/\r?\n|;|•|\u2022/)
     .map((item) => item.replace(/^[-*]\s*/, '').trim())
     .filter(Boolean);
 };
-
 const normalizeCategory = (
   value: string | null,
 ): SchemeItem['category'] => {
